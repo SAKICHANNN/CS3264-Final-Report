@@ -93,15 +93,92 @@ Machine learning has been effective in detecting patterns of drug interactions a
 
 We can further leverage the strengths of interpretable ML models—such as their ability to provide human-understandable decision rules and feature contributions—to ensure that medical professionals can trust and effectively utilise the model's predictions. More details will be explored in the solution section.
 
-\subsection{ethical considerations}
+\subsection{Ethical considerations}
 
 While the previous sections mentions about the advatages of using machine learning algorithms to detect drug interactions, we also acknowledge the important ethical considerations as the healthcare industry typically involves high-stake responsibilities where many believe that human decisions must be involved. Drug prescription is no exception. 
 
 First, any misjudgement by the algorithm must be held accountable. The machine learning algorithm can never make any independent judgement on its own without human oversight. The patient, who are unable to judge the accuracy of the predicted drug interaction result, should also not be exposed to the decision making process. Therefore, we envision the algorithm to be most ethically positioned as advisory to the doctors, with which the doctor gives the final decision on whether the drug interaction may actually happen and be held accountable for his own judgement as a medical professional.
 
 \section{Method}
-\subsection{Data collection}
-\subsection{Algorithm}
+\subsection{Data construction}
+\subsubsection{Data source}
+\ 
+\newline
+We use the BIOSNAP ChChMiner dataset, which is derived from DrugBank and contains experimentally validated drug-drug interaction (DDI) pairs. Each entry in the raw dataset consists of two DrugBank IDs indicating that the pair of drugs is known to interact and should not be used together. After filtering out drug pairs for which molecular structures could not be retrieved, our dataset contains approximately 40,000 positive examples (interacting pairs). 
+
+\subsubsection{Negative sample construction}
+\ 
+\newline
+The BIOSNAP dataset only contains known positive interactions. Since no ground-truth negative pairs are provided, we construct negative examples by randomly sampling drug pairs that do not appear in the positive set. We follow the standard 1:1 positive-to-negative ratio.
+
+We acknowledge that this procedure relies on the closed world assumption that pairs absent from DrugBank are treated as non-interacting, though some may represent undiscovered interactions. This is a well-recognised limitation of DDI benchmarks and is consistent with prior work in this area.
+
+\subsubsection{Molecular feature representation}
+\ 
+\newline
+Each drug is represented as a 166-dimensional binary fingerprint generated using the MACCS Keys (Molecular ACCess System) scheme via RDKit. MACCS Keys encode the presence or absence of 166 predefined chemical substructures, such as the presence of a benzene ring (Key 120), a carboxyl group (Key 148), or a nitrogen-containing heterocycle (Key 80). Each bit is either 1 (substructure present) or 0 (absent).
+
+During data preprocessing, we removed MACCS bits with zero variance across all drugs in the dataset, which also means the bits that are either universally present of universally absent. These features carry no discriminative information and their removal reduces noise in the input representation. After this filtering step, the effective fingerprint dimensionality is reduced from 166 to 162 bits per drug, resulting in a final feature vector of 324 dimensions per drug pair.
+
+We chose MACCS Keys over the more commonly used Morgan fingerprints mainly because each MACCS bit corresponds to a named, chemically interpretable substructure, which directly supports our interpretability analysis using SHAP. 
+
+\begin{equation}
+    x = [\mathbf{fp}_A \| \mathbf{fp}_B] \in \{0,1\}^{324}
+\end{equation}
+
+\subsubsection{Symmetry augmentation}
+\ 
+\newline
+DDI is inherently symmetric because if Drug A interacts with Drug B, then Drug B interacts with Drug A. However, the concatenation scheme above is order-sensitive: $[\mathbf{fp}_A \| \mathbf{fp}_B] \neq [\mathbf{fp}_B \| \mathbf{fp}_A]$.
+To prevent the model from learning spurious positional biases, we augment the dataset by including both orderings of every drug pair, effectively doubling the dataset size.
+
+\subsubsection{Dataset splits}
+\ 
+\newline
+The final dataset is split into training, validation, and test sets at an 80/10/10 ratio, with stratification to preserve the class balance across all splits.
+
+\subsection{Algorithm and models}
+We train four models of increasing complexity on the same dataset and splits, so that performance differences can be attributed solely to model architecture.
+
+\subsubsection{Logistic Regression}
+\ 
+\newline
+Logistic Regression serves as our linear baseline. It computes a weighted sum of all 332 input features and passes the result through a sigmoid function to produce an interaction probability:
+
+\begin{equation}
+    \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b)
+\end{equation}
+
+Despite its simplicity, logistic regression provides a meaningful lower bound on performance and highlights the limitations of linear decision boundaries in this task. 
+
+\subsubsection{Random Forest}
+\ 
+\newline
+Random Forest is an ensemble of decision trees, each trained on a random bootstrap sample of the training data with a random subset of features considered at each split. Predictions are aggregated by majority vote across all trees.
+
+This model introduces two important capabilities over logistic regression. First, individual decision trees can capture non-linear feature interactions. For example, learning rules such as "if Drug A contains a CYP3A4-related motif AND Drug B contains an aromatic ring, predict interaction." Second, the ensemble mechanism reduces overfitting by averaging over diverse trees that each capture different patterns in the data. We train a forest of 100 trees with all other hyperparameters set to their sklearn defaults.
+
+\subsubsection{MLP}
+\ 
+\newline
+Our Multi-Layer Perceptron consists of three fully-connected hidden layers with ReLU activations and dropout regularisation:
+
+\begin{center}
+    $324 \rightarrow 256 \rightarrow 128 \rightarrow 64 \rightarrow 1$
+\end{center}
+Dropout with probability 0.3 is applied after each of the first two hidden layers to reduce overfitting. The output layer uses a sigmoid activation to produce an interaction probability. The model is trained with the Adam optimiser (learning rate $10^{-3}$) and binary cross-entropy loss for 50 epochs, with the best checkpoint selected based on validation AUC-ROC.
+
+Compared to Random Forest, the MLP learns hierarchical, distributed representations of the drug pair, allowing it to capture more abstract feature interactions. However, it treats the concatenated 324-dimensional vector as a flat input, with no explicit mechanism to compare features across the two drugs.
+
+\subsubsection{MLP with Attention}
+\ 
+\newline
+To address the limitation above, we introduce a cross-drug attention mechanism. Instead of immediately flattening both fingerprints into a single vector, we first encode Drug A and Drug B separately through a shared encoder:
+
+\begin{equation}
+    \mathbf{h}_A = \mathrm{Encoder}(\mathbf{fp}_A), \mathbf{h}_B = \mathrm{Encoder}(\mathbf{fp}_B)
+\end{equation}
+
 \subsection{Training process}
 \section{Results}
 \bibliography{CS3264_Final_Report}
