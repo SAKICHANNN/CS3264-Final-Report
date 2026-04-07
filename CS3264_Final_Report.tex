@@ -62,7 +62,7 @@
 \maketitle
 
 \begin{abstract}
-The rapid advancement of healthcare systems and increased life expectancy have led to a growing prevalence of polypharmacy, particularly among elderly patients in Singapore. This paper proposes an interpretable machine learning application to predict the risk of adverse drug interactions, providing transparent explanations to support clinical decision-making tailored to the Singapore context.
+Polypharmacy is a growing concern in Singapore's ageing population, substantially increasing the risk of adverse drug-drug interactions (DDIs). We apply three interpretable machine learning models---Logistic Regression, MLP, and Random Forest---to binary DDI prediction using MACCS molecular fingerprints derived from the BIOSNAP ChChMiner dataset. Random Forest achieves the strongest predictive performance and supports transparent, clinician-readable explanations via tree-ranked decision paths, making it well-suited for clinical decision support in the Singapore context.
 \end{abstract}
 
 \section{Introduction}
@@ -105,18 +105,17 @@ First, any misjudgement by the algorithm must be held accountable. The machine l
 
 \section{Method}
 
-We first define the input and the output of our machine learning model. The input is a pair of drugs and the patient's condition, and the output contains the possibility predicted about whether the two drugs interact with each other.
+We first define the input and the output of our machine learning model. The input is a pair of drug molecular fingerprints, and the output is the predicted probability of an adverse interaction between the two drugs.
 We mathematically express our model as follows:
 
 \begin{equation}
-    \hat{y} = F(D_A, D_B)
+    \hat{y} = F(D_A, D_B), \hat{y} \in [0, 1]
 \end{equation}
 
-where $D_A, D_B \in \mathbb{R}^{d}$ are the molecular fingerprints of Drug A and Drug B with dimension $d$, respectively, and $c$ is the patient's condition vector. The function $F$ represents the machine learning model that takes these inputs and produces a prediction $\hat{y}$ indicating the probability of an interaction. In our experiment, we use random forest  as our machine learning models, which will be further explained in the next section.
+where $D_A, D_B \in \mathbb{R}^{d}$ are the molecular fingerprints of Drug A and Drug B with dimension $d$, respectively. The function $F$ represents the machine learning model that produces a prediction $\hat{y}$ indicating the probability of an interaction. In our experiment, we use random forest as our primary machine learning model, which will be further explained in the next section.
 
-Then with the output possibility $\hat{y}$, we can further apply a threshold to determine whether the drug pair is predicted to interact or not. For example, if $\hat{y} > 0.3$, we can classify the drug pair as interacting; otherwise, we classify it as non-interacting. After interacting pairs are identified, we can further provide an explanation of the interaction through the interpretable machine learning model, which will be discussed in the next section.
+Then with the output possibility $\hat{y}$, we can further apply a threshold $\delta$ to determine whether the drug pair is predicted to interact or not. For example, if $\hat{y} > \delta$, we can classify the drug pair as interacting; otherwise, we classify it as non-interacting. After interacting pairs are identified, we can further provide an explanation of the interaction through the interpretable machine learning model, which will be discussed in the next section.
 
-Additionally, with the predicted interaction, we can further predict the severity of the interaction of the drug pair. For example, we can classify the severity into three levels: mild, moderate, and severe based on the patient's condition and the predicted interaction. This can be achieved by training a separate model that takes the predicted interaction and patient's condition as input and outputs the severity level.
 
 \subsection{Datasets and Data Structures}
 
@@ -127,16 +126,6 @@ For drug interactions, we use the \textbf{BIOSNAP ChChMiner} dataset, which is d
 
 The BIOSNAP dataset only contains known positive interactions. Since no ground-truth negative pairs are provided, we construct negative examples by randomly sampling drug pairs that do not appear in the positive set. We follow the standard 1:1 positive-to-negative ratio. We acknowledge that this procedure relies on the assumption that pairs absent from DrugBank are treated as non-interacting, though some may represent undiscovered interactions. This is a well-recognised limitation of DDI benchmarks and is consistent with prior work in this area.
 
-Considering patient condition, we use \textbf{FDA FARES} dataset, which contain reports of patients having adverse reactions after taking certain combination of drugs with their personal information about age, gender and etc.with the patients' consent.
-
-\subsubsection{Molecular Feature Representation}
-\ 
-\newline
-Each drug is represented as a 166-dimensional binary fingerprint generated using the MACCS Keys (Molecular ACCess System) scheme via RDKit. MACCS Keys encode the presence or absence of 166 predefined chemical substructures, such as the presence of a benzene ring (Key 120), a carboxyl group (Key 148), or a nitrogen-containing heterocycle (Key 80). Each bit is either 1 (substructure present) or 0 (absent).
-
-During data preprocessing, we removed MACCS bits with zero across all drugs in the dataset, which also means the bits representing chemicals that are universally absent. These chemical strucutres are not conventionally used in drugs and their removal reduces noise in the input representation. After this filtering step, the effective fingerprint dimensionality is reduced from 166 to 162 bits per drug.
-
-We chose MACCS Keys over the more commonly used Morgan fingerprints mainly because each MACCS bit corresponds to a named, chemically interpretable substructure, which directly supports our interpretability analysis.
 
 
 \subsection{Input construction}
@@ -144,8 +133,7 @@ We chose MACCS Keys over the more commonly used Morgan fingerprints mainly becau
 \subsubsection{Drug Interaction Pairs}
 \
 \newline
-For the input, we represent each drug using its molecular fingerprint represented by MACCS keys. MACCS keys converts chemical structures into a binary vector of 166 dimensions based on the presence or absence of specific chemical substructures.\cite{rdkit} It is also widely adpoted in pharmaceutical research as a form of data representation of drugs\cite{xie2020improvement,durant2002reoptimization} The model learns to predict the interaction label based on the combined features of the two drugs.
-For instance, the 120 th dimension of the input vector indicates the presence of a benzene ring.\cite{rdkit} 
+Each drug is represented as a 166-dimensional MACCS Keys (Molecular ACCess System) binary fingerprint \cite{rdkit}, encoding the presence or absence of predefined chemical substructures (e.g., Key 120 = benzene ring, Key 148 = carboxyl group). MACCS Keys are widely adopted in pharmaceutical research \cite{xie2020improvement,durant2002reoptimization} and, unlike Morgan fingerprints, each bit maps to a named, chemically interpretable substructure, directly supporting our interpretability analysis. After removing zero-variance bits (universally absent across our dataset), the effective dimensionality is reduced from 166 to 162. The model learns to predict the interaction label based on the combined features of the two drugs.
 
 However, to study the pair of drugs as the input, we need to combine their molecular fingerprints into a single vector. In other words, 
 \begin{center}$x = g(D_A, D_B)$
@@ -171,49 +159,31 @@ where $x_i$ is the $i$-th dimension of the input vector, corresponding to the $i
 
 
 
-\subsubsection{Patient Condition}
-\
-\newline
-A simple binary vector will be used to represent the presence or absence of certain conditions that are relevant to drug interactions. This allows the model to consider how patient-specific factors may influence the likelihood and severity of drug interactions.
-
 \subsection{Algorithm and models}
 We decided to leverage random forest as the major model for prediction and explanation. Random forest is a powerful ensemble learning method that combines multiple decision trees to improve predictive performance and control overfitting. It is particularly well-suited for our task due to its ability to handle high-dimensional, sparse input data (like molecular fingerprints) and its inherent interpretability through feature importance measures and decision paths.
 
 \subsubsection{Logistic Regression}
+\
+\newline
+Logistic Regression is our linear baseline, operating on the 324-dimensional concatenated drug-pair fingerprint. It provides a lower bound on performance and quantifies the benefit of non-linear models for this task.
+
+\subsubsection{Multi-Layer Perceptrons (MLP)}
 \ 
 \newline
-Logistic Regression serves as our linear baseline. It computes a weighted sum of all 324 input features and passes the result through a sigmoid function to produce an interaction probability:
-
-\begin{equation}
-    \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b)
-\end{equation}
-
-Despite its simplicity, logistic regression provides a meaningful lower bound on performance and highlights the limitations of linear decision boundaries in this task.
-
-\subsubsection{MLP}
-\ 
-\newline
-Our Multi-Layer Perceptron consists of three fully-connected hidden layers with ReLU activations and dropout regularisation:
-
-\begin{center}
-    $162 \rightarrow 162 \rightarrow 128 \rightarrow 64 \rightarrow 1$
-\end{center}
-Dropout with probability 0.3 is applied after each of the first two hidden layers to reduce overfitting. The output layer uses a sigmoid activation to produce an interaction probability. The model is trained with the Adam optimiser (learning rate $10^{-3}$) and binary cross-entropy loss for 50 epochs, with the best checkpoint selected based on validation AUC-ROC.
-
-We can express a simplified example of how the MLP learns to capture complex chemical interactions as the following.
+Intuitively, MLP with logistic output layer is a natural choice for this task, as it can capture complex, non-linear relationships in a binary classification setting such as drug interactions.
+\paragraph{Why non-linearity is necessary.}
+Consider a simplified scenario with only two chemical substructures $x_1, x_2 \in \{0,1,2\}$, where the value encodes how many drugs in the pair contain that substructure (Figure~\ref{fig:decision_boundary}). Suppose an adverse interaction occurs precisely when both chemicals are present across the drug pair, i.e., the true label is $y=1$ iff $x_1 \geq 1$ \emph{and} $x_2 \geq 1$. The four interacting pairs (circled) occupy the upper-right region of the grid, while the non-interacting pairs lie along the axes.
 
 \begin{figure}[h!]
     \centering
     \includegraphics[width=0.95\columnwidth]{./MLP.png}
     \caption{A simple example of learning drug interactions with only two types of chemicals involved.}
-    \label{fig:MLP}
+    \label{fig:decision_boundary}
 \end{figure}
 
-From the figure above, we assume that the true concept $c(x) = 1,  x_1 \geq 1 \text{ and } x_2 \geq 1$, which means that the presence of both chemical $x_1$ and $x_2$ in the target drug pair will lead to an adverse interaction. We can then utilise the universal approximation theorem of neural networks to claim that this true function is recoverable thorugh MLP. 
+The particular relationship presented in the figure cannot be captured through naive logistic regression without any feature transformation since the size of input instance space $|X| = 9$ while $VC(H) = 3 < 9$ when the hypothesis space is expressed as a linear decision boundary $w_1 x_1 + w_2 x_2 > b$. On the other hand, through the universal approximation theorem, MLP allows any polynomial continuous functions to be accurately approximated with sufficient number of neurons.
 
-The particular relationship presented in the figure cannot be captured through naive logistic regression without any feature transformation since the size of input instance space $|X| = 9$ while $VC(H) = 3 < 9$ when the hypothesis space consists of all linear combinations of $x_1$ and $x_2$. On the other hand, MLP leverages on the universal approximation theroem which allows any polynomial continuous functions to be accurately approximated with sufficient number of neurons.
-
-However, a major limitation of MLP algorithm is its difficulty in providing an interpretable explanation to the doctor when advising possible drug interactions. First, the MLP learns the true function through universal approximation theorem which makes it impossible to recover the true function that MLP is approximating towards. Second, given that chemical reactions take place independently, MLP conflates all chemical reactions in one single hypothesis which makes it difficult to retrieve the separate reactions that may take place between two drugs.
+However, a major limitation of MLP algorithm is its difficulty in providing an interpretable explanation to the doctor when advising possible drug interactions. First, the MLP learns the true function through universal approximation theorem which makes it impossible to recover the true function itself. Second, given that chemical reactions take place independently, MLP conflates all chemical reactions in one single hypothesis which makes it difficult to retrieve the separate reactions that may take place between two drugs.
 
 \subsubsection{Random Forest}
 \
@@ -221,18 +191,7 @@ However, a major limitation of MLP algorithm is its difficulty in providing an i
 Random Forest, introduced by \citet{Breiman2001}, is a non-parametric ensemble method that combines the predictions of $T$ independently trained decision trees to reduce variance while retaining the low bias of individual trees. Each tree $\mathcal{T}_t$ ($t = 1, \ldots, T$) is trained on a bootstrap resample $\mathcal{D}_t \sim \text{Bootstrap}(\mathcal{D})$ drawn \emph{with replacement} from the full training set $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}$, where $\mathbf{x}_i \in \mathbb{R}^{p}$ and $y_i \in \{0, 1\}$.
  
 \paragraph{Tree Construction via CART.}
-Every tree is grown using the Classification and Regression Tree (CART) algorithm \cite{Breiman1984}. At each internal node $v$ with sample set $S_v$, CART selects the feature index $j^*$ and threshold $\tau^*$ that minimise the weighted Gini impurity of the resulting split:
-\begin{equation}
-    (j^*, \tau^*) = \arg\min_{j \in \mathcal{M}_v,\; \tau}
-    \frac{|S_L|}{|S_v|}\, G(S_L) + \frac{|S_R|}{|S_v|}\, G(S_R),
-    \label{eq:cart_split}
-\end{equation}
-where $S_L = \{\mathbf{x} \in S_v : x_j \leq \tau\}$, $S_R = S_v \setminus S_L$, and the Gini impurity of a node $S$ is
-\begin{equation}
-    G(S) = 1 - \sum_{k \in \{0,1\}} \hat{p}_k^2, \quad
-    \hat{p}_k = \frac{|\{\mathbf{x} \in S : y = k\}|}{|S|}.
-    \label{eq:gini}
-\end{equation}
+Each tree is grown using CART splits on Gini impurity \cite{Breiman1984}.
 
 \paragraph{Ensemble Prediction.}
 Given $T$ fitted trees, the predicted interaction probability for a drug pair $\mathbf{x}$ is the average of the per-tree leaf class probabilities:
@@ -242,22 +201,28 @@ Given $T$ fitted trees, the predicted interaction probability for a drug pair $\
 \end{equation}
 where $\hat{p}_t(\mathbf{x})$ is the fraction of positive training samples in the leaf node of tree $\mathcal{T}_t$ that $\mathbf{x}$ falls into. A binary prediction is obtained by thresholding $\hat{y}$ against a chosen operating point $\delta$:
 
- In our experiments, we train a forest of $T = 100$ trees using the \texttt{sklearn} defaults: $m = \lfloor\sqrt{p}\rfloor$, unlimited tree depth, and minimum samples per leaf of 1.
-
 \paragraph{Applicability to This Task.}
 Several properties of the DDI task make Random Forest a principled model choice.
  
 \textit{(i) Ordinal feature space.} Our combined drug-pair fingerprint $\mathbf{x} \in \{0, 1, 2\}^{p}$ arises from element-wise addition of two MACCS binary vectors. Each coordinate takes one of three ordinal integer values, and CART splits of the form $x_j \leq \tau$ partition this space without requiring any normalisation or distributional assumption, which is particularly important for chemical fingerprint data \cite{Svetnik2003}.
  
-\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as ``$x_j = 2$ (both drugs must share the same substance) \emph{and} $x_k, x_r \geq 1$ (Both drugs together contain chemeicals represented by index $k$ or $r$ that may interact with each other).'' Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, random forest's ensemble strategy — which exploits decorrelated, parallel trees — is theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in several prior studies\cite{Gottlieb2012,Vilar2012,Ryu2018}.
+\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as ``$x_j = 2$ (both drugs must share the same substance) \emph{and} $x_k, x_r \geq 1$ (Both drugs together contain chemicals represented by index $k$ or $r$ that may interact with each other).'' Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, random forest's ensemble strategy — which exploits decorrelated, parallel trees — is theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in several prior studies\cite{Gottlieb2012,Vilar2012,Ryu2018}.
  
-\subsubsection{Interpretability via Tree-Ranked Decision Path Output}
+\paragraph{Why not gradient boosting?}
+Gradient boosting (e.g., XGBoost) is a strong alternative for tabular DDI prediction \cite{Ryu2018}, but its sequential tree construction means each tree models \emph{residuals} of the prior ensemble rather than the original labels. This makes individual tree paths uninterpretable in isolation, undermining our TRDP strategy which relies on each tree being an independent, self-contained classifier whose decision path is directly readable as a conjunctive rule.
+
+\subsubsection{Interpretable Random Forest}
 \
 \newline
-Here we adopt a novel strategy: we
-\emph{rank the trees themselves} and, for each top-ranked tree, output
-its \emph{complete} root-to-leaf decision path.  A full path is a
-conjunction of conditions and istherefore directly interpretable by a clinician without further aggregation.
+We proposed two possible strategies for interpreting a random forest's prediction: (1) aggregate feature importance across the entire ensemble(SHAP explainer), or (2) examine the decision paths of individual trees, as a more naive but potentially more interpretable alternative.
+
+\subsubsection{SHAP Feature Attribution.}
+SHAP TreeExplainer \cite{Lundberg2020} produces a continuous attribution score $\phi_j$ per feature, satisfying the Shapley axioms (efficiency, symmetry, and null player), which guarantee that the attributions are \emph{faithful} to the ensemble's overall prediction.
+
+\subsubsection{TRDP: Tree-Ranked Decision Path Output}
+While SHAP provides a global feature importance ranking, it does not directly reveal the specific decision rules that led to the prediction. To address this, we propose a complementary method called \textbf{Tree-Ranked Decision Path Output (TRDP)}, which directly surfaces the most influential decision paths from the ensemble's constituent trees.
+
+TRDP \emph{rank all trees with positive votes directly} and, for each top-ranked tree, output its \emph{complete} root-to-leaf decision path.  A full path is a conjunction of conditions and is therefore directly interpretable by a clinician without further aggregation.
  
 \paragraph{Decision Path of a Single Tree.}
 For a test sample $\mathbf{x}$ and tree $\mathcal{T}_t$, define the
@@ -324,9 +289,12 @@ $\Rightarrow$ both drugs carry a carboxyl group.}\\
 
 This format is structurally analogous to a clinical decision rule, a format already familiar to medical professionals \cite{Rudin2019}. Each node corresponds to a testable chemical property; taken together, the conjunction of decision tree paths constitutes a complete, falsifiable hypothesis about why the interaction is predicted.
  
-\paragraph{Relationship to SHAP.}
-SHAP TreeExplainer \cite{Lundberg2020} produces a continuous attribution score $\phi_j$ per feature, computed as the average marginal
-contribution of feature $j$ across all feature orderings. However, the tree-rank path better captures the reaction that involves several \textbf{groups} of chemicals. On the other hand, SHAP's ranking of individual features may fail to capture the interaction between a group of chemicals that are present in the same drug pair, which is a common mechanism of drug interactions.
+\paragraph{Discussion}
+TRDP offers a complementary practical benefit for clinical deployment. SHAP outputs a vector of real-valued attribution scores, which must be further interpreted by the clinician to form an actionable hypothesis. In contrast, each TRDP path is a conjunction of discrete, testable conditions (e.g., ``both drugs contain a carboxyl group \emph{and} at least one contains a benzene ring''), mirroring the if-then decision rules already used in clinical practice \cite{Rudin2019}. This makes TRDP explanations immediately actionable without post-hoc interpretation.
+
+A practical limitation of TRDP is path length: with fully grown trees, decision paths can exceed 20 conditions, reducing readability. To mitigate this, we first limit the maximum depth of each tree to a reasonable value. we set $d_{\max}^{\mathrm{report}} = 5$.
+
+In our evaluation, we cross-validate TRDP outputs against SHAP feature attributions: for each test prediction, we verify that the features appearing in the top-$K$ TRDP paths substantially overlap with the highest-$|\phi_j|$ SHAP features, providing empirical evidence that the selected paths are not outlier artefacts of individual bootstrap samples.
  
 
 
@@ -336,167 +304,19 @@ contribution of feature $j$ across all feature orderings. However, the tree-rank
 \newline
 The final dataset is split into training, validation, and test sets at an 80/10/10 ratio, with stratification to preserve the class balance across all splits.
 \subsection{MLP}
-\subsection{Random Forest}
-\section{Results}
-\bibliography{CS3264_Final_Report}
-\section{appendix}
+% TODO: Add experimental details and results.
+Our Multi-Layer Perceptron consists of three fully-connected hidden layers with ReLU activations and dropout regularisation:
 
-\subsection*{Appendix A: Notation}
- 
-Table~\ref{tab:notation} summarises all mathematical symbols used in
-the Random Forest and Tree-Ranked Decision Path (TRDP) sections.
- 
-\begin{table}[h]
-\centering
-\caption{Mathematical notation for the Random Forest and TRDP sections.}
-\label{tab:notation}
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{>{\(}c<{\)} p{5.6cm}}
-\toprule
-\textbf{Symbol} & \textbf{Description} \\
-\midrule
- 
-%% ----- Dataset -----
-\multicolumn{2}{l}{\textit{Dataset}} \\[2pt]
-\mathcal{D}
-    & Full labelled training set $\{(\mathbf{x}_i, y_i)\}_{i=1}^{n}$ \\
-n
-    & Number of training samples \\
-p
-    & Feature dimensionality; $p = 162$ after MACCS preprocessing \\
-\mathbf{x}_i
-    & Feature vector of training sample $i$,
-      $\mathbf{x}_i \in \mathbb{R}^{p}$ \\
-y_i
-    & Binary interaction label, $y_i \in \{0,1\}$ \\
-\mathbf{x}
-    & Query drug-pair feature vector (test sample),
-      $\mathbf{x} \in \{0,1,2\}^{p}$ \\
-x_j
-    & $j$-th coordinate of $\mathbf{x}$, corresponding to MACCS key $j$;
-      $x_j \in \{0,1,2\}$ \\
-k
-    & Class index, $k \in \{0,1\}$
-      ($0$ = non-interacting, $1$ = interacting) \\
- 
-\midrule
-%% ----- Ensemble -----
-\multicolumn{2}{l}{\textit{Ensemble (Forest Level)}} \\[2pt]
-T
-    & Total number of trees in the forest \\
-t
-    & Tree index, $t \in \{1, \ldots, T\}$ \\
-\mathcal{T}_t
-    & The $t$-th decision tree \\
-\mathcal{F}
-    & Fitted forest $\{\mathcal{T}_t\}_{t=1}^{T}$ \\
-\mathcal{D}_t
-    & Bootstrap resample used to train tree $t$,
-      drawn with replacement from $\mathcal{D}$ \\
-F(\mathbf{x})
-    & Ensemble prediction function;
-      outputs the predicted interaction probability \\
-\hat{y}
-    & Predicted interaction probability,
-      $\hat{y} = F(\mathbf{x}) \in [0,1]$ \\
-\tilde{y}
-    & Binary interaction prediction,
-      $\tilde{y} = \mathbf{1}[\hat{y} > \theta]$ \\
-\theta
-    & Classification threshold applied to $\hat{y}$ to produce
-      $\tilde{y}$ \\
-\hat{p}_t(\mathbf{x})
-    & Fraction of positive training samples in the leaf of tree
-      $\mathcal{T}_t$ reached by $\mathbf{x}$;
-      serves as the per-tree class probability and confidence score \\
-\rho
-    & Average pairwise correlation between trees in the ensemble \\
-\sigma^2
-    & Per-tree prediction variance \\
-\mathrm{Var}[F]
-    & Variance of the ensemble predictor $F$ \\
- 
-\midrule
-%% ----- CART node level -----
-\multicolumn{2}{l}{\textit{Node Level (CART Tree Construction)}} \\[2pt]
-v
-    & An internal node in a decision tree \\
-S_v
-    & Set of training samples routed to node $v$ \\
-S_L,\;S_R
-    & Left and right child sample sets produced by a split at $v$ \\
-j
-    & Candidate split feature index, $j \in \{1,\ldots,p\}$ \\
-j^*
-    & Optimal split feature index selected by CART at a given node \\
-\tau
-    & Candidate split threshold \\
-\tau^*
-    & Optimal split threshold selected by CART at a given node \\
-\mathcal{M}_v
-    & Random feature subset considered at node $v$,
-      $\mathcal{M}_v \subseteq \{1,\ldots,p\}$ \\
-m
-    & Size of the random feature subset,
-      $m = \lfloor\sqrt{p}\rfloor$ \\
-G(S)
-    & Gini impurity of a sample set $S$;
-      $G(S) = 1 - \sum_{k}\hat{p}_k^{\,2}$ \\
-\hat{p}_k
-    & Fraction of class-$k$ samples in a node:
-      $|\{\mathbf{x}{\in}S : y{=}k\}|\,/\,|S|$ \\
-\hat{p}
-    & Shorthand for $\hat{p}_1$, the fraction of positive samples
-      in a node (binary case) \\
-d_{\max}
-    & Maximum depth across all trees in the forest \\
-d_{\max}^{\mathrm{report}}
-    & Maximum number of path nodes reported to the clinician
-      (post-hoc display cap; does not affect model training) \\
- 
-\midrule
-%% ----- TRDP interpretability -----
-\multicolumn{2}{l}{\textit{TRDP Analysis (Interpretability)}} \\[2pt]
-\Pi_t(\mathbf{x})
-    & Ordered sequence of split conditions along the root-to-leaf
-      path of tree $\mathcal{T}_t$ for query $\mathbf{x}$ \\
-c_l^{(t)}
-    & The $l$-th split condition in the path of tree $t$;
-      a triple $(j_l^{(t)}, \tau_l^{(t)}, \delta_l^{(t)})$ \\
-c
-    & A generic condition triple $(j,\tau,\delta)$ when the
-      tree index is implicit \\
-j_l^{(t)}
-    & MACCS key index of the split at depth $l$ in tree $t$ \\
-\tau_l^{(t)}
-    & Split threshold at depth $l$ in tree $t$;
-      $\tau_l^{(t)} \in \{0.5,\,1.5\}$ for ordinal features \\
-\delta_l^{(t)}
-    & Branch direction taken by $\mathbf{x}$ at depth $l$ in tree $t$;
-      $\delta_l^{(t)} \in \{\leq,\,>\}$ \\
-d_t
-    & Depth of the path in tree $t$
-      (number of internal nodes traversed) \\
-l
-    & Depth index along a root-to-leaf path,
-      $l \in \{1,\ldots,d_t\}$ \\
-\mathcal{T}^{+}(\mathbf{x})
-    & Set of positive-voting trees for sample $\mathbf{x}$:
-      $\{t : \hat{p}_t(\mathbf{x}) > 0.5\}$ \\
-\psi(t,\mathbf{x})
-    & Tree ranking score (leaf confidence) for tree $t$ on sample
-      $\mathbf{x}$; defined as $\hat{p}_t(\mathbf{x})$ \\
-\mathcal{T}^{*}(\mathbf{x})
-    & Top-$K$ trees from $\mathcal{T}^{+}(\mathbf{x})$ ranked by
-      $\psi(t,\mathbf{x})$ in descending order \\
-K
-    & Number of top-ranked trees whose full paths are reported
-      as explanations \\
-\phi_j
-    & SHAP attribution score for feature $j$
-      (used for cross-validation against TRDP output) \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{center}
+    $162 \rightarrow 162 \rightarrow 128 \rightarrow 64 \rightarrow 1$
+\end{center}
+Dropout with probability 0.3 is applied after each of the first two hidden layers to reduce overfitting. The output layer uses a sigmoid activation to produce an interaction probability. The model is trained with the Adam optimiser (learning rate $10^{-3}$) and binary cross-entropy loss for 50 epochs, with the best checkpoint selected based on validation AUC-ROC.
+
+\subsection{Random Forest}
+ In our experiments, we train a forest of $T = 100$ trees using the \texttt{sklearn} defaults: $m = \lfloor\sqrt{p}\rfloor$, unlimited tree depth, and minimum samples per leaf of 1.
+
+\section{Results}
+% TODO: Add experimental details and results.
+\bibliography{CS3264_Final_Report}
 
 \end{document}
