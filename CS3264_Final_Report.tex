@@ -131,9 +131,12 @@ Since BIOSNAP contains only known positive drug-drug interactions (DDIs), negati
 \subsubsection{Drug Interaction Pairs}
 \
 \newline
-Each drug is represented as a 166-dimensional MACCS Keys (Molecular ACCess System) binary fingerprint \cite{rdkit}, encoding the presence or absence of predefined chemical substructures (e.g., Key 158 = carbon–nitrogen single bond). MACCS Keys are widely adopted in pharmaceutical research \cite{xie2020improvement,durant2002reoptimization} and, unlike Morgan fingerprints, each bit maps to a named, chemically interpretable substructure, directly supporting our interpretability analysis. After removing zero-variance bits (universally absent across our dataset), the effective dimensionality is reduced from 166 to 162. The model learns to predict the interaction label based on the combined features of the two drugs.
+Each drug is represented as a 166-dimensional MACCS Keys (Molecular ACCess System) binary fingerprint \cite{rdkit}, encoding the presence or absence of predefined chemical substructures (e.g., Key 158 = carbon–nitrogen single bond). MACCS Keys are widely adopted in pharmaceutical research \cite{xie2020improvement,durant2002reoptimization} and, unlike Morgan fingerprints, each bit maps to a named, chemically interpretable substructure, directly supporting our interpretability analysis. 
 
-However, to study the pair of drugs as the input, we need to combine their molecular fingerprints into a single vector. In other words, 
+We also removed zero bits (chemical structures universally absent across our dataset),which reduces the effective dimensionality is reduced from 166 to x.  It is necessary because zero bits do not contribute to the model's decision and may introduce noise, while also improving computational efficiency. Removing zero bits can also enhance the interpretability of the model by focusing on the relevant chemical features. For instance, Key 2 is interpreted as `Contains an atom with atomic number $\geq$ 104 (e.g. Rutherfordium)', which is very unlikely to be present in any drug molecule, and thus can be safely removed without losing any predictive information.
+% TODO: Perform data cleaning such that zero bits are removed and report the final dimension of the input vector after removing zero bits, which bits are removed and the interpretation of those bits.
+
+The model learns to predict the interaction label based on the combined features of the two drugs.However, to study the pair of drugs as the input, we need to combine their molecular fingerprints into a single vector. In other words, 
 \begin{center}$x = g(D_A, D_B)$
 \end{center}
 where $g$ is the function that combines the two drug fingerprints into a single input vector.
@@ -278,10 +281,10 @@ list of $d_t$ human-readable conditions.  For example, the top-ranked
 tree's explanation might read:
 \begin{quote}
 \emph{Tree rank 1 (leaf confidence $= 0.94$):}\\
-\emph{[Node 1]\; Key 120 $> 0.5$\;
-$\Rightarrow$ at least one drug has a benzene ring.}\\
-\emph{[Node 2]\; Key 148 $> 1.5$\;
-$\Rightarrow$ both drugs carry a carboxyl group.}\\
+\emph{[Node 1]\; Key 99 $= 1$\;
+$\Rightarrow$ At least one drug contains a carbon–carbon double bond}\\
+\emph{[Node 2]\; Key 148 $= 2$\;
+$\Rightarrow$ both drugs contain Heteroatom bonded to three other atoms.}\\
 \emph{$\Rightarrow$ \textbf{Predicted: Interaction.}}
 \end{quote}
 
@@ -317,11 +320,16 @@ Dropout with probability 0.3 is applied after each of the first two hidden layer
 % TODO: Add experimental details and results.
 \subsection{Prediciive performance}
 We used the confusion matrix as our major evaluation metric to evaluate the performance of our model. The confusion matrix is a 2x2 table that summarises the performance of a classification model by showing the counts of true positives (TP), true negatives (TN), false positives (FP), and false negatives (FN). The predicitive accuracy is measured in the validation set. 
-%TODO: Result for the following: MLP logistics Random forest with diffent hyperparameters(max depth = 3/5/10/20 and number of trees = 50/100/200)
+%TODO: Result for the following: MLP /logistics/ Random forest/ with diffent hyperparameters(max depth = 3/5/10/20 and number of trees = 50/100/200)
 
 \subsection{Interpretability}
 We evaluate the interpretability of our model through two complementary approaches: (1) qualitative analysis of TRDP explanations, and (2) quantitative correlation between TRDP-selected features and SHAP attributions.
 
+%TODO: Implement the random forest such that it uses shap and trdp separately. The experiment result, instead of being the accuracy score, should be an output result between the drug name(if possible), prediction result, explanation(if positive) A sample explanation is seen on the section: interpretable random forest. Also, compare the two different possible explanations provided by SHAP and TRDP and make an evaluation in how they differ and which one is better in the context of interpretability %
+
+\subsection{evaluation}
+\subsection{limitatiions}
+\section{Conclusion and Future Work}
 \bibliography{CS3264_Final_Report}
 \section{Appendix A: MACCS Key to interpretation table}
 The original MACCS Keys consist of 166 bits, each corresponding to a specific chemical substructure. The interpretation of each key was uploaded in the following link. We have converted the chemical substructure into a more human-readable format, which is shown in the link below The table also includes the original MACCS key number for reference.
