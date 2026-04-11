@@ -133,9 +133,6 @@ Since BIOSNAP contains only known positive drug-drug interactions (DDIs), negati
 \newline
 Each drug is represented as a 166-dimensional MACCS Keys (Molecular ACCess System) binary fingerprint \cite{rdkit}, encoding the presence or absence of predefined chemical substructures (e.g., Key 158 = carbon–nitrogen single bond). MACCS Keys are widely adopted in pharmaceutical research \cite{xie2020improvement,durant2002reoptimization} and, unlike Morgan fingerprints, each bit maps to a named, chemically interpretable substructure, directly supporting our interpretability analysis. 
 
-We also removed zero bits (chemical structures universally absent across our dataset),which reduces the effective dimensionality is reduced from 166 to x.  It is necessary because zero bits do not contribute to the model's decision and may introduce noise, while also improving computational efficiency. Removing zero bits can also enhance the interpretability of the model by focusing on the relevant chemical features. For instance, Key 2 is interpreted as `Contains an atom with atomic number $\geq$ 104 (e.g. Rutherfordium)', which is very unlikely to be present in any drug molecule, and thus can be safely removed without losing any predictive information.
-% TODO: Perform data cleaning such that zero bits are removed and report the final dimension of the input vector after removing zero bits, which bits are removed and the interpretation of those bits.
-
 The model learns to predict the interaction label based on the combined features of the two drugs.However, to study the pair of drugs as the input, we need to combine their molecular fingerprints into a single vector. In other words, 
 \begin{center}$x = g(D_A, D_B)$
 \end{center}
@@ -158,7 +155,7 @@ There are several possible ways to combine the two drug fingerprints, such as co
 
 where $x_i$ is the $i$-th dimension of the input vector, corresponding to the $i$-th MACCS key. 
 
-
+We also removed zero bits (chemical structures universally absent across our dataset), which reduces the effective dimensionality from 166 to $x$. This is necessary because zero bits do not contribute to the model's decision and may introduce noise, while also improving computational efficiency. Removing zero bits also enhances the interpretability of the model by focusing on the relevant chemical features. For instance, Key 2 is interpreted as ``Contains an atom with atomic number $\geq$ 104 (e.g.\ Rutherfordium),'' which is very unlikely to be present in any drug molecule and can be safely removed without losing any predictive information.
 
 \subsection{Algorithm and models}
 We decided to leverage random forest as the major model for prediction and explanation. Random forest is a powerful ensemble learning method that combines multiple decision trees to improve predictive performance and control overfitting. It is particularly well-suited for our task due to its ability to handle high-dimensional, sparse input data (like molecular fingerprints) and its inherent interpretability through feature importance measures and decision paths.
@@ -207,7 +204,7 @@ Several properties of the DDI task make Random Forest a principled model choice.
  
 \textit{(i) Ordinal feature space.} Our combined drug-pair fingerprint $\mathbf{x} \in \{0, 1, 2\}^{p}$ arises from element-wise addition of two MACCS binary vectors. Each coordinate takes one of three ordinal integer values, and CART splits of the form $x_j \leq \tau$ partition this space without requiring any normalisation or distributional assumption, which is particularly important for chemical fingerprint data \cite{Svetnik2003}.
  
-\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as ``$x_j = 2$ (both drugs must share the same substance) \emph{and} $x_k, x_r \geq 1$ (Both drugs together contain chemicals represented by index $k$ or $r$ that may interact with each other).'' Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, random forest's ensemble strategy — which exploits decorrelated, parallel trees — is theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in several prior studies\cite{Gottlieb2012,Vilar2012,Ryu2018}.
+\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as  $x_k, x_r \geq 1$ (Both drugs together contain chemicals represented by index $k$ or $r$ that may interact with each other). Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, the decorrelated, parallel trees from the random forest are theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in several prior studies\cite{Gottlieb2012,Vilar2012,Ryu2018}.
  
 \paragraph{Why not gradient boosting?}
 Gradient boosting is a strong alternative for tabular DDI prediction \cite{Ryu2018}, but its sequential tree construction means each tree models \emph{residuals} of the prior ensemble rather than the original labels. This makes individual tree paths uninterpretable in isolation, undermining our TRDP strategy which relies on each tree being an independent, self-contained classifier whose decision path is directly readable as a conjunctive rule.
@@ -289,17 +286,27 @@ $\Rightarrow$ both drugs contain Heteroatom bonded to three other atoms.}\\
 \end{quote}
 
 This format is structurally analogous to a clinical decision rule, a format already familiar to medical professionals \cite{Rudin2019}. Each node corresponds to a testable chemical property; taken together, the conjunction of decision tree paths constitutes a complete, falsifiable hypothesis about why the interaction is predicted.
- 
+
 \paragraph{Discussion}
 TRDP offers a complementary practical benefit for clinical deployment. SHAP outputs a vector of real-valued attribution scores, which must be further interpreted by the clinician to form an actionable hypothesis. In contrast, each TRDP path is a conjunction of discrete, testable conditions (e.g., ``both drugs contain a carboxyl group \emph{and} at least one contains a benzene ring''), mirroring the if-then decision rules already used in clinical practice \cite{Rudin2019}. This makes TRDP explanations immediately actionable without post-hoc interpretation.
 
-A practical limitation of TRDP is path length: with fully grown trees, decision paths can exceed 20 conditions, reducing readability. To mitigate this, we first limit the maximum depth of each tree to a reasonable value. 
 
 In our evaluation, we cross-validate TRDP outputs against SHAP feature attributions: for each test prediction, we verify that the features appearing in the top-$K$ TRDP paths substantially overlap with the highest-$|\phi_j|$ SHAP features, providing empirical evidence that the selected paths are not outlier artefacts of individual bootstrap samples.
- 
 
+\paragraph{limitation and improvement} 
+
+A practical limitation of TRDP is path length: with fully grown trees, decision paths can exceed 20 conditions, reducing readability. To mitigate this, we first limit the maximum depth of each tree to a reasonable value. 
+
+We also note that the sparsity of MACCS fingerprints poses a structural challenge for TRDP. For a reaction mechanism involving $r$ salient features, we require all $r$ features to appear consecutively at the top of at least one decision tree for the explanation to be maximally interpretable. Assuming $m$ features are sampled uniformly at each split (with replacement for simplicity), with $n$ trees trained in total, the probability $p$ that at least one tree places all $r$ features at the top of its decision path is:
+\begin{equation}
+   p = 1 - \left(1 - r! \left(\frac{m}{d}\right)^{r}\right)^{n}
+\end{equation}
+where $d$ is the total number of features after zero-bit removal. With $m = 12$, $n = 100$, and $d = 164$, we obtain $p \approx 0.66$ for $r = 2$ and $p \approx 0.20$ for $r = 3$. This shows that TRDP's ability to surface complete interaction rules degrades rapidly as the number of contributing features grows.
+
+To mitigate this, we propose a two-stage approach: first train a preliminary random forest with uniform feature sampling and compute SHAP feature attributions, then use the resulting importance scores as sampling weights when constructing a second forest. Features with higher SHAP importance are more likely to be selected at each split, increasing the probability that genuinely relevant features co-occur in the same decision path. This directly improves TRDP reliability while preserving stochasticity in feature selection, since low-importance features retain non-zero sampling probability. We acknowledge that SHAP importances derived from the first-stage forest may reflect dataset-specific biases, potentially limiting the second-stage model's ability to genralise to novel drug pairs whose interactions depend on features underrepresented in the training data.
 
 \section{Experiment Process}
+
 \subsection{Dataset splits}
 \ 
 \newline
