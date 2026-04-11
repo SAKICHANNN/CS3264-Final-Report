@@ -93,9 +93,9 @@ Second, Singapore exhibits a unique disease profile, with high rates of metaboli
 
 Machine learning has been effective in detecting patterns of drug interactions as it can be categorised as a classification task.\cite{Gheorghita2025} When the number of drugs involved in a single prescription increase, we expect the number of possible pair of drugs that may produce interaction to increase exponentially($N =$ $n\choose2$, n is the number of drugs and N is the number of possible pairs), which eventually leads to human oversight. 
 
-Even though there are available databases nowadays where doctors can use for reference. Machine learning algorithm further enhances drug interaction detection as it is able to predict the reaction purely through the chemical structure of the drugs. This capability is relevant to Singapore context as most of the databases are constructed through sources from Western countries, where some prescriptions more commonly utilised in Singapore may be unavailable because of different disease profiles.
+Although drug-interaction databases remain useful references for known interactions, machine learning can complement them by predicting previously unobserved DDIs from structured drug features such as chemical fingerprints and related representations. In addition, medication appropriateness criteria for older adults have often been developed for Western populations and may not transfer directly to Asian settings, reinforcing the need to evaluate clinician-facing medication-safety tools in the local Singapore context
 
-We can further leverage the strengths of interpretable ML models—such as their ability to provide human-understandable decision rules and feature contributions—to ensure that medical professionals can trust and effectively utilise the model's predictions. More details will be explored in the solution section.
+Furthermore, In a high-stakes clinical setting, such interpretability is necessary, because clinicians must be able to understand why a possible interaction has been flagged for a decision.\cite{Nasarian2024} Thus, We leverage interpretable ML algorithm against black-box models with stronger accuracies but less interpretability necessary for clinical support.
 
 \subsection{Ethical considerations}
 
@@ -325,7 +325,7 @@ Dropout with probability 0.3 is applied after each of the first two hidden layer
 
 \section{Results}
 % TODO: Add experimental details and results.
-\subsection{Prediciive performance}
+\subsection{Predictive performance}
 We used the confusion matrix as our major evaluation metric to evaluate the performance of our model. The confusion matrix is a 2x2 table that summarises the performance of a classification model by showing the counts of true positives (TP), true negatives (TN), false positives (FP), and false negatives (FN). The predicitive accuracy is measured in the validation set. 
 %TODO: Result for the following: MLP /logistics/ Random forest/ with diffent hyperparameters(max depth = 3/5/10/20 and number of trees = 50/100/200)
 
@@ -335,7 +335,7 @@ We evaluate the interpretability of our model through two complementary approach
 %TODO: Implement the random forest such that it uses shap and trdp separately. The experiment result, instead of being the accuracy score, should be an output result between the drug name(if possible), prediction result, explanation(if positive) A sample explanation is seen on the section: interpretable random forest. Also, compare the two different possible explanations provided by SHAP and TRDP and make an evaluation in how they differ and which one is better in the context of interpretability %
 
 \subsection{evaluation}
-\subsection{limitatiions}
+\subsection{limitations}
 \section{Conclusion and Future Work}
 \bibliography{CS3264_Final_Report}
 \section{Appendix A: MACCS Key to interpretation table}
