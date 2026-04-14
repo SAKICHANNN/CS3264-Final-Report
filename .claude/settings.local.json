@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pdflatex -interaction=nonstopmode CS3264_Final_Report.tex)"
+    ]
+  }
+}

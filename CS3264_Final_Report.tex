@@ -1,5 +1,5 @@
 \documentclass[letterpaper]{article} % DO NOT CHANGE THIS
-\usepackage[submission]{aaai2026}  % DO NOT CHANGE THIS
+\usepackage[]{aaai2026}  % DO NOT CHANGE THIS
 \usepackage{times}  % DO NOT CHANGE THIS
 \usepackage{helvet}  % DO NOT CHANGE THIS
 \usepackage{courier}  % DO NOT CHANGE THIS
@@ -11,6 +11,8 @@
 \usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
 \frenchspacing  % DO NOT CHANGE THIS
 \setlength{\pdfpagewidth}{8.5in} % DO NOT CHANGE THIS
 \setlength{\pdfpageheight}{11in} % DO NOT CHANGE THIS
@@ -44,39 +46,33 @@
 % Title
 \title{Interpretable Machine Learning for Predicting Adverse Drug Interactions in Singapore}
 \author{
-    % Authors - Replace with actual names
-    An Xiao\textsuperscript{\rm 1},
-    Liu Lexi\textsuperscript{\rm 2},
-    Zhou Zirun\textsuperscript{\rm 3}
+    An Xiao (A0300401J)\textsuperscript{\rm 1},
+    Liu Lexi ()\textsuperscript{\rm 2},
+    Zhou Zirun ()\textsuperscript{\rm 3},
+    Group 17
 }
-\affiliations{
-    % Affiliations
-    \textsuperscript{\rm 1}School of Computing, National University of Singapore\\
-    student1@nus.edu.sg, student2@nus.edu.sg, student3@nus.edu.sg
-}
+
 
 \begin{document}
 
 \maketitle
 
 \begin{abstract}
-The rapid advancement of healthcare systems and increased life expectancy have led to a growing prevalence of polypharmacy, particularly among elderly patients in Singapore. This paper proposes an interpretable machine learning application to predict the risk of adverse drug interactions, providing transparent explanations to support clinical decision-making tailored to the Singapore context.
+Polypharmacy is a growing concern in Singapore's ageing population, substantially increasing the risk of adverse drug-drug interactions (DDIs). We apply three interpretable machine learning models---Logistic Regression, MLP, and Random Forest---to binary DDI prediction using MACCS molecular fingerprints derived from the BIOSNAP ChChMiner dataset. Random Forest achieves the strongest predictive performance and supports transparent, clinician-readable explanations via tree-ranked decision paths, making it well-suited for clinical decision support in the Singapore context.
 \end{abstract}
 
 \section{Introduction}
 
-The rapid advancement of healthcare systems and increased life expectancy have led to a growing prevalence of polypharmacy, where patients—particularly elderly individuals—are prescribed multiple medications simultaneously. While such multi-drug therapies are often necessary for managing chronic conditions, they significantly increase the risk of drug-drug interactions (DDIs). Statistics show that DDIs may greatly contribute to a worsening patient condition through adverse side effects.\cite{Chan2016:chan}, and the risk of DDIs is underperceived by the medical industry.\cite{polypharmacy}
+The rapid advancement of healthcare systems and increased life expectancy have led to a growing prevalence of polypharmacy, where patients, particularly elderly individuals,are prescribed multiple medications simultaneously. While such multi-drug therapies are often necessary for managing chronic conditions, they significantly increase the risk of drug-drug interactions (DDIs). Statistics show that DDIs may greatly contribute to a worsening patient condition through adverse side effects.\cite{Chan2016:chan}, and the risk of DDIs is underperceived by the medical industry.\cite{polypharmacy}
 
-DDI is especially critical in Singapore.\cite{Ho2023} Given that there is a vacuum in reliable formal methods among Singaporean doctors to avoid drug interactions, we propose to leverage machine learning algorithms to provide explainable advice to Singaporean doctors on possible drug interactions for every prescription. We first show that drug interaction is an important issue that can be properly addressed through machine learning algorithm under Singaporean context. We will then expound on the further details in our choice of the machine learning algorithm and its training process. Last but not the least, we will demonstrate the result of our prototypical machine learning application and how it benefits Singapore's medical industry through providing explainable advice on potential drug interactions in prescriptions.
+DDI is especially critical in Singapore,\cite{Ho2023} where no reliable formal tool exists to assist clinicians at the point of prescribing. We propose an interpretable ML system that flags potentially risky drug pairs and explains each prediction in clinician-readable terms.
 
 
 \section{Motivation}
 
 \subsection{Drug interactions as a severe issue in Singapore}
 
-DDI has been recognised as a significant contributor to the degeneration of patient health \cite{polypharmacy,Chan2016:chan}. The complexity of managing multiple medications increases the likelihood of unintended interactions, making it crucial for healthcare providers to have effective tools for predicting and preventing DDIs.
-
-Singapore presents a particularly important context for addressing this problem. First, the country's demographic structure is shifting toward an ageing society, with a high proportion of elderly individuals requiring long-term medication.\cite{singstat_population_2025} Figure 1 shows our rough estimate of the elderly population in Singapore in 2025 based on the age distribution of the population and the stratified death rate of different age groups\cite{singstat_death_rate_2025} in Singapore in 2025. With aging population, the number of senior citizen is expected to proliferate in the upcoming decades, which indicates a sharp increase in the demand of polypharmacy due to the positive association between seniority of an individual to more complex medication needs.\cite{Ho2023,Wong2019} 
+Singapore presents a particularly important context for addressing this problem. First, the country's demographic structure is shifting toward an ageing society, with a high proportion of elderly individuals requiring long-term medication.\cite{singstat_population_2025} Figure 1 shows our rough estimate of the elderly population in Singapore based on the age distribution of the population and the stratified death rate of different age groups\cite{singstat_death_rate_2025} in Singapore in 2025. A sharp increase in the demand of polypharmacy is therefore expected.\cite{Ho2023}
 
 \begin{figure}[t]
     \centering
@@ -85,15 +81,17 @@ Singapore presents a particularly important context for addressing this problem.
     \label{fig:population_pyramid}
 \end{figure}
 
-Second, Singapore exhibits a unique disease profile, with high rates of metabolic and cardiovascular conditions, which often necessitate multi-drug treatment plans.\cite{hop_health_concerns_2025} 
-
-Third, the healthcare system in Singapore emphasises precision medicine and efficient clinical decision-making, creating a strong demand for tools that can assist healthcare professionals in evaluating complex prescription combinations.Even though there are drug interaction database and alogrithms available, the data are mostly collected from a more Western profile. The bias in the data collected may lead to potential underrepresentation of certain diseases that are more common among Singaporeans. The underrepresentation indicates that the current algorithms may not be the most appropriate under Singaporean context and there is a significant space for improvement for us.  
+Second, Singapore exhibits a unique disease profile, with high rates of metabolic and cardiovascular conditions(to cite), which often necessitate multi-drug treatment plans.  Existing drug safety guidelines for older adults have often been developed for Western populations and may not transfer directly to Asian settings, reinforcing the need to evaluate clinician-facing medication-safety tools in the local Singapore context.(to cite) Accordingly, our proposed app is intended as a prescription-stage decision support tool for clinicians in Singapore, flagging potentially risky drug pairs.
 
 \subsection{Why machine learning algorithms}
 
 Machine learning has been effective in detecting patterns of drug interactions as it can be categorised as a classification task.\cite{Gheorghita2025} When the number of drugs involved in a single prescription increase, we expect the number of possible pair of drugs that may produce interaction to increase exponentially($N =$ $n\choose2$, n is the number of drugs and N is the number of possible pairs), which eventually leads to human oversight. 
 
-We can further leverage the strengths of interpretable ML models—such as their ability to provide human-understandable decision rules and feature contributions—to ensure that medical professionals can trust and effectively utilise the model's predictions. More details will be explored in the solution section.
+Although drug-interaction databases remain useful references for known interactions, machine learning can complement them by predicting previously unobserved DDIs from structured drug features such as chemical fingerprints and related representations. 
+
+Furthermore, in a high-stakes clinical setting, such interpretability is necessary, because doctors must be able to understand why a possible interaction has been flagged for a decision. Thus, We leverage interpretable ML algorithm against black-box models with stronger accuracies but less interpretability necessary for clinical support.
+
+
 
 \subsection{Ethical considerations}
 
@@ -103,28 +101,30 @@ First, any misjudgement by the algorithm must be held accountable. The machine l
 
 \section{Method}
 
-We first define the input and the output of our machine learning model. The input is a pair of drugs and the patient's condition, and the output contains the possibility predicted about whether the two drugs interact with each other.
-We mathematically express our model as follows:
-
+We formalize DDI prediction as:
 \begin{equation}
-    \hat{y} = F(D_A, D_B)
+    \hat{y} = F(D_A, D_B), \quad \hat{y} \in [0, 1]
 \end{equation}
+where $D_A, D_B \in \mathbb{R}^{d}$ are MACCS fingerprints of the two drugs and $\hat{y}$ is the predicted interaction probability. A threshold $\delta$ converts $\hat{y}$ into a binary prediction; flagged pairs are then explained by our interpretable model.
 
-where $D_A, D_B \in \mathbb{R}^{d}$ are the molecular fingerprints of Drug A and Drug B with dimension $d$, respectively, and $c$ is the patient's condition vector. The function $F$ represents the machine learning model that takes these inputs and produces a prediction $\hat{y}$ indicating the probability of an interaction. In our experiment, we use random forest  as our machine learning models, which will be further explained in the next section.
 
-Then with the output possibility $\hat{y}$, we can further apply a threshold to determine whether the drug pair is predicted to interact or not. For example, if $\hat{y} > 0.3$, we can classify the drug pair as interacting; otherwise, we classify it as non-interacting. After interacting pairs are identified, we can further provide an explanation of the interaction through the interpretable machine learning model, which will be discussed in the next section.
+\subsection{Datasets and Data Structures}
 
-Additionally, with the predicted interaction, we can further predict the severity of the interaction of the drug pair. For example, we can classify the severity into three levels: mild, moderate, and severe based on the patient's condition and the predicted interaction. This can be achieved by training a separate model that takes the predicted interaction and patient's condition as input and outputs the severity level.
+\subsubsection{Data Source}
+\ 
+\newline
+We use the \textbf{BIOSNAP ChChMiner} dataset, which is derived from DrugBank and contains experimentally validated drug-drug interaction (DDI) pairs. Each entry in the raw dataset consists of two DrugBank IDs indicating that the pair of drugs is known to interact and should not be used together. After filtering out drug pairs for which molecular structures could not be retrieved, our dataset contains approximately 40,000 positive examples (interacting pairs). 
+
+Since BIOSNAP contains only known positive drug-drug interactions (DDIs), negative examples must be constructed. Following standard practice, we randomly sample drug pairs absent from the positive set, or drug pairs with identical drugs at a 1:1 ratio, under two assumptions: a drug does not interact with itself, and any pair not listed in DrugBank is treated as non-interacting. While the latter assumption may exclude undiscovered interactions, this open-world limitation is well-recognised in DDI benchmarking and consistent with prior work. (To Cite)
 
 \subsection{Input construction}
 
 \subsubsection{Drug Interaction Pairs}
 \
 \newline
-For the input, we represent each drug using its molecular fingerprint represented by MACCS keys. MACCS keys converts chemical structures into a binary vector of 166 dimensions based on the presence or absence of specific chemical substructures.\cite{rdkit} It is also widely adpoted in pharmaceutical research as a form of data representation of drugs\cite{xie2020improvement,durant2002reoptimization} The model learns to predict the interaction label based on the combined features of the two drugs.
-For instance, the 120 th dimension of the input vector indicates the presence of a benzene ring.\cite{rdkit}
+Each drug is represented as a 166-dimensional MACCS Keys (Molecular ACCess System) binary fingerprint \cite{rdkit}, encoding the presence or absence of predefined chemical substructures (e.g., Key 158 = carbon–nitrogen single bond). MACCS Keys are widely adopted in pharmaceutical research \cite{durant2002reoptimization} and, unlike Morgan fingerprints, each bit maps to a named, chemically interpretable substructure, directly supporting our interpretability analysis. 
 
-To combine the two drug fingerprints into a single input vector, we perform addition of the two 166-dimensional vectors, resulting in a trinary 166-dimensional vector that captures the combined chemical features of both drugs. In other words, the input vector for a drug pair is represented as:
+We combine the two fingerprints via $x = g(D_A, D_B)$, requiring $g$ to be symmetric and interpretability-preserving. Element-wise addition satisfies both: for each MACCS key $i$,
 
 \begin{equation}
     x_i = \begin{cases}
@@ -136,94 +136,433 @@ To combine the two drug fingerprints into a single input vector, we perform addi
 
 where $x_i$ is the $i$-th dimension of the input vector, corresponding to the $i$-th MACCS key. 
 
-This new representation resolves two major challenges. First, most machine learning algorithms only took one single vector as input, and the addition operation allows us to combine the two drug fingerprints into a single vector without losing any information. Second, the addition operation is commutative, which means that the order of the drugs does not affect the input representation. This is important because drug interactions are symmetric; if Drug A interacts with Drug B, then Drug B interacts with Drug A.
+\subsection{Algorithm and models}
 
-\subsubsection{Patient Condition}
+\subsubsection{Logistic Regression}
+\
+Logistic Regression is our linear baseline, operating on the 324-dimensional concatenated drug-pair fingerprint. It provides a lower bound on performance and quantifies the benefit of non-linear models for this task.
+
+\subsubsection{Multi-Layer Perceptrons (MLP)}
+\ 
+Intuitively, MLP with logistic output layer is a natural choice for this task, as it can capture complex, non-linear relationships in a binary classification setting such as drug interactions.
+
+The particular relationship presented in drug interaction through naive logistic regression without any feature transformation since the true function can be non-linear. On the other hand, through the universal approximation theorem, MLP allows any polynomial continuous functions to be accurately approximated with sufficient number of neurons. (To Cite)
+
+However, a major limitation of MLP algorithm is its difficulty in providing an interpretable explanation to the doctor when advising possible drug interactions. Although algorithms such as LIME provides model-agnostic explanations. There are simpler alternatives such as SHAP, whose limitation will be discussed in the later section.
+
+\subsubsection{Random Forest}
 \
 \newline
-A simple binary vector will be used to represent the presence or absence of certain conditions that are relevant to drug interactions. This allows the model to consider how patient-specific factors may influence the likelihood and severity of drug interactions.
+Random Forest, introduced by \citet{Breiman2001}, is a non-parametric ensemble method that combines the predictions of $T$ independently trained decision trees to reduce variance while retaining the low bias of individual trees. Each tree $\mathcal{T}_t$ ($t = 1, \ldots, T$) is trained on a bootstrap resample $\mathcal{D}_t \sim \text{Bootstrap}(\mathcal{D})$ drawn \emph{with replacement} from the full training set $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}$, where $\mathbf{x}_i \in \mathbb{R}^{p}$ and $y_i \in \{0, 1\}$.
+ 
+\paragraph{Tree Construction via CART.}
+Each tree is grown using CART splits on Gini impurity \cite{Breiman1984}, where $m$ features are randomly sampled each time a new branch extends from the root node and the best split is only chosen within the sampled features based on the boostrap sample of training data.
 
-
-\subsubsection{Data source}
-\ 
-\newline
-We use the BIOSNAP ChChMiner dataset, which is derived from DrugBank and contains experimentally validated drug-drug interaction (DDI) pairs. Each entry in the raw dataset consists of two DrugBank IDs indicating that the pair of drugs is known to interact and should not be used together. After filtering out drug pairs for which molecular structures could not be retrieved, our dataset contains approximately 40,000 positive examples (interacting pairs). 
-
-\subsubsection{Negative sample construction}
-\ 
-\newline
-The BIOSNAP dataset only contains known positive interactions. Since no ground-truth negative pairs are provided, we construct negative examples by randomly sampling drug pairs that do not appear in the positive set. We follow the standard 1:1 positive-to-negative ratio.
-
-We acknowledge that this procedure relies on the assumption that pairs absent from DrugBank are treated as non-interacting, though some may represent undiscovered interactions. This is a well-recognised limitation of DDI benchmarks and is consistent with prior work in this area.
-
-\subsubsection{Molecular feature representation}
-\ 
-\newline
-Each drug is represented as a 166-dimensional binary fingerprint generated using the MACCS Keys (Molecular ACCess System) scheme via RDKit. MACCS Keys encode the presence or absence of 166 predefined chemical substructures, such as the presence of a benzene ring (Key 120), a carboxyl group (Key 148), or a nitrogen-containing heterocycle (Key 80). Each bit is either 1 (substructure present) or 0 (absent).
-
-During data preprocessing, we removed MACCS bits with zero variance across all drugs in the dataset, which also means the bits that are either universally present or universally absent. These features carry no discriminative information and their removal reduces noise in the input representation. After this filtering step, the effective fingerprint dimensionality is reduced from 166 to 162 bits per drug, resulting in a final feature vector of 324 dimensions per drug pair.
-
-We chose MACCS Keys over the more commonly used Morgan fingerprints mainly because each MACCS bit corresponds to a named, chemically interpretable substructure, which directly supports our interpretability analysis using SHAP. 
-
+\paragraph{Ensemble Prediction.}
+Given $T$ fitted trees, the predicted interaction probability for a drug pair $\mathbf{x}$ is the average of the per-tree leaf class probabilities:
 \begin{equation}
-    x = [\mathbf{fp}_A \| \mathbf{fp}_B] \in \{0,1\}^{324}
+    \hat{y} = F(\mathbf{x}) = \frac{1}{T} \sum_{t=1}^{T} \hat{p}_t(\mathbf{x}),
+    \label{eq:rf_pred}
 \end{equation}
+where $\hat{p}_t(\mathbf{x})$ is the fraction of positive training samples in the leaf node of tree $\mathcal{T}_t$ that $\mathbf{x}$ falls into. A binary prediction is obtained by thresholding $\hat{y}$ against a chosen operating point $\delta$:
 
-\subsubsection{Symmetry augmentation}
-\ 
+\paragraph{Applicability to This Task.}
+Several properties of the DDI task make Random Forest a principled model choice.
+ 
+\textit{(i) Ordinal feature space.} CART splits $x_j \leq \tau$ natively partition the $\{0,1,2\}^p$ fingerprint space without requiring normalisation or any assumption on the distribution of the features.
+
+\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as  $x_k, x_r \geq 1$ (Both drugs together contain chemicals represented by index $k$ or $r$ that may interact with each other). Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, the decorrelated, parallel trees from the random forest are theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in prior work\cite{Ryu2018}.
+
+
+\paragraph{Why not other models?}
+Other applicable models such as gradient boosting machines which may produce more accurate results. However, gradient boosting machine trains its decides branch based on the residual of the previous result which renders gradient boosting uninterpretable. (To Cite)
+
+
+\subsubsection{Interpretable Random Forest}
+\
 \newline
-DDI is inherently symmetric because if Drug A interacts with Drug B, then Drug B interacts with Drug A. However, the concatenation scheme above is order-sensitive: $[\mathbf{fp}_A \| \mathbf{fp}_B] \neq [\mathbf{fp}_B \| \mathbf{fp}_A]$.
-To prevent the model from learning spurious positional biases, we augment the dataset by including both orderings of every drug pair, effectively doubling the dataset size.
+We consider two interpretation strategies: (1) SHAP feature attributions aggregated across the ensemble, and (2) direct examination of individual tree decision paths.
 
-\subsubsection{Dataset splits}
+\subsubsection{SHAP Feature Attribution.}
+SHAP TreeExplainer \cite{Lundberg2020} produces a continuous attribution score $\phi_j$ per feature, satisfying the Shapley axioms (efficiency, symmetry, and null player), which guarantee that the attributions are \emph{faithful} to the ensemble's overall prediction.
+
+\subsubsection{TRDP: Tree-Ranked Decision Path Output}
+While SHAP provides a global feature importance ranking, it does not directly reveal the specific decision rules that led to the prediction. To address this, we propose a complementary method called \textbf{Tree-Ranked Decision Path Output (TRDP)}, which directly surfaces the most influential decision paths from the ensemble's constituent trees.
+
+TRDP \emph{rank all trees with positive votes directly} and, for each top-ranked tree, output its \emph{complete} root-to-leaf decision path.  A full path is a conjunction of conditions and is therefore directly interpretable by a clinician without further aggregation.
+ 
+\paragraph{Decision Path of a Single Tree.}
+For a test sample $\mathbf{x}$ and tree $\mathcal{T}_t$, define the
+\emph{decision path} as the ordered sequence of split conditions
+encountered from the root to the reached leaf:
+\begin{equation}
+    \Pi_t(\mathbf{x}) =
+    \bigl(c_1^{(t)},\; c_2^{(t)},\; \ldots,\; c_{d_t}^{(t)}\bigr),
+    \label{eq:path}
+\end{equation}
+where $d_t$ is the depth of the reached leaf and each $c_i^{(t)}$ is a human-readable condition from the decision tree.
+
+\paragraph{Ranking Positive Trees.}
+Only trees that individually voted for an interaction carry explanatory
+relevance for the positive prediction.  Define the set of
+\emph{positive-voting trees} as
+\begin{equation}
+    \mathcal{T}^{+}(\mathbf{x}) =
+    \bigl\{t \in \{1,\ldots,T\} : \hat{p}_t(\mathbf{x}) > 0.5\bigr\},
+    \label{eq:pos_trees}
+\end{equation}
+where $\hat{p}_t(\mathbf{x})$ is the fraction of positive training
+samples in the leaf of tree $\mathcal{T}_t$ reached by $\mathbf{x}$.
+The ensemble predicts a positive interaction when
+$|\mathcal{T}^{+}(\mathbf{x})| > T/2$, so $\mathcal{T}^{+}(\mathbf{x})$
+is guaranteed to be non-empty whenever $\tilde{y} = 1$.
+ 
+However, not all positive-voting trees are equally informative as explanations.
+A tree whose reached leaf contains 95\% positive training samples made
+a highly decisive vote; a tree at 51\% barely cleared the threshold and
+its path reflects a weakly discriminative rule.  We rank trees by their
+\emph{leaf confidence}, defined as
+\begin{equation}
+    \psi(t, \mathbf{x}) = \hat{p}_t(\mathbf{x}),
+    \label{eq:tree_score}
+\end{equation}
+and sort $\mathcal{T}^{+}(\mathbf{x})$ in descending order of
+$\psi(t, \mathbf{x})$.  The top-$K$ trees in this ranking, are selected as the explanation representatives.
+A natural default is $K = 1$ (the single most confident positive-voting
+tree), which produces a minimal, easily communicated rule.
+Setting $K > 1$ surfaces alternative rule sets that independently
+support the prediction, giving the clinician a sense of how
+structurally diverse the forest's reasoning is.
+ 
+For each tree $t \in \mathcal{T}^{*}(\mathbf{x})$, ranked by confidence,
+we output the complete decision path $\Pi_t(\mathbf{x})$ as an ordered
+list of $d_t$ human-readable conditions.  For example, the top-ranked
+tree's explanation might read:
+\begin{quote}
+\emph{Tree rank 1 (leaf confidence $= 0.94$):}\\
+\emph{[Node 1]\; Key 99 $= 1$\;
+$\Rightarrow$ At least one drug contains a carbon–carbon double bond}\\
+\emph{[Node 2]\; Key 148 $= 2$\;
+$\Rightarrow$ both drugs contain Heteroatom bonded to three other atoms.}\\
+\emph{$\Rightarrow$ \textbf{Predicted: Interaction.}}
+\end{quote}
+
+This mirrors a clinical decision rule \cite{Rudin2019}: each node is a testable chemical property, and the full path is a falsifiable hypothesis about why the interaction is predicted. We choose to only display the \textbf{top 5} conditions in top-$K$ trees for better readability.
+
+\paragraph{Discussion}
+Unlike SHAP's real-valued scores, each TRDP path is a conjunction of discrete, testable conditions mirroring clinical if-then rules \cite{Rudin2019}, making it immediately actionable. TRDP predicted path only captures general patterns that may not accurately represent the actual chemical reaction. However, we still regard that as a better interpretation than pure attribute importance output from SHAP.
+
+\paragraph{Limitation and improvement}
+
+Path length is a practical concern: fully grown trees can yield paths exceeding 20 conditions, so we cap tree depth. A deeper limitation arises from fingerprint sparsity: the probability that all $r$ salient features co-occur in a single tree's path is:
+\begin{equation}
+   p = 1 - \left(1 - r! \left(\frac{m}{d}\right)^{r}\right)^{n}
+\end{equation}
+where $m$ features are sampled per split, $n$ is the number of trees, and $d$ is the number of non-zero features. With $m=12$, $n=100$, $d=164$: $p\approx0.66$ for $r=2$ and $p\approx0.20$ for $r=3$, degrading rapidly with $r$.
+
+We propose a two-stage remedy: train a preliminary RF to obtain SHAP importances, then use those as feature-sampling weights in a second forest, increasing co-occurrence of relevant features in single paths. A limitation is that first-stage SHAP scores may reflect dataset biases, potentially reducing generalisation to novel drug pairs.
+
+\section{Experiment Process}
+
+\subsection{Dataset splits}
 \ 
 \newline
 The final dataset is split into training, validation, and test sets at an 80/10/10 ratio, with stratification to preserve the class balance across all splits.
-
-\subsection{Algorithm and models}
-We train four models of increasing complexity on the same dataset and splits, so that performance differences can be attributed solely to model architecture.
-
-\subsubsection{Logistic Regression}
-\ 
-\newline
-Logistic Regression serves as our linear baseline. It computes a weighted sum of all 324 input features and passes the result through a sigmoid function to produce an interaction probability:
-
-\begin{equation}
-    \hat{y} = \sigma(\mathbf{w}^T \mathbf{x} + b)
-\end{equation}
-
-Despite its simplicity, logistic regression provides a meaningful lower bound on performance and highlights the limitations of linear decision boundaries in this task. 
-
-\subsubsection{Random Forest}
-\ 
-\newline
-Random Forest is an ensemble of decision trees, each trained on a random bootstrap sample of the training data with a random subset of features considered at each split. Predictions are aggregated by majority vote across all trees.
-
-This model introduces two important capabilities over logistic regression. First, individual decision trees can capture non-linear feature interactions. For example, learning rules such as "if Drug A contains a CYP3A4-related motif AND Drug B contains an aromatic ring, predict interaction." Second, the ensemble mechanism reduces overfitting by averaging over diverse trees that each capture different patterns in the data. We train a forest of 100 trees with all other hyperparameters set to their sklearn defaults.
-
-\subsubsection{MLP}
-\ 
-\newline
+\subsection{MLP}
 Our Multi-Layer Perceptron consists of three fully-connected hidden layers with ReLU activations and dropout regularisation:
 
 \begin{center}
-    $324 \rightarrow 256 \rightarrow 128 \rightarrow 64 \rightarrow 1$
+    $162 \rightarrow 162 \rightarrow 128 \rightarrow 64 \rightarrow 1$
 \end{center}
+
 Dropout with probability 0.3 is applied after each of the first two hidden layers to reduce overfitting. The output layer uses a sigmoid activation to produce an interaction probability. The model is trained with the Adam optimiser (learning rate $10^{-3}$) and binary cross-entropy loss for 50 epochs, with the best checkpoint selected based on validation AUC-ROC.
 
-Compared to Random Forest, the MLP learns hierarchical, distributed representations of the drug pair, allowing it to capture more abstract feature interactions. However, it treats the concatenated 324-dimensional vector as a flat input, with no explicit mechanism to compare features across the two drugs.
+\subsection{Random Forest}
+ In our experiments, we train a forest of $T = 200$ trees using the \texttt{sklearn} defaults: $m = \lfloor\sqrt{p}\rfloor$. We limit the tree depth to 20 to ensure interpretability of individual trees, and minimum samples per leaf of 1. We also limit the maximum number of displayed decision branches in the explanation to 5.
 
-\subsubsection{MLP with Attention}
-\ 
-\newline
-To address the limitation above, we introduce a cross-drug attention mechanism. Instead of immediately flattening both fingerprints into a single vector, we first encode Drug A and Drug B separately through a shared encoder:
+We compare two random forests: the \textbf{standard TRDP RF} with uniform feature sampling, and the \textbf{SHAP-adjusted TRDP RF} where features are sampled proportionally to their SHAP importance scores from the first-stage forest. We display the top-5 conditions of the top-1 tree ($K=1$) for interpretability evaluation.
 
-\begin{equation}
-    \mathbf{h}_A = \mathrm{Encoder}(\mathbf{fp}_A), \mathbf{h}_B = \mathrm{Encoder}(\mathbf{fp}_B)
-\end{equation}
+\subsection{Implementation}
+Molecular fingerprints are computed using \textbf{RDKit}~\cite{rdkit}. LR and RF are implemented in \textbf{scikit-learn}; MLP is implemented in \textbf{PyTorch} with the Adam optimiser. SHAP attributions are computed via the \textbf{SHAP} TreeExplainer library~\cite{Lundberg2020}. All experiment code is available in the repository listed in Appendix~B.
 
-\subsection{Training process}
 \section{Results}
+\subsection{Predictive Performance}
+We evaluate all models on the held-out test set (16,728 samples, balanced 1:1) using the confusion matrix as our primary diagnostic, supplemented by AUC-ROC, F1, precision, and recall.  All three models share the same 167-dimensional additive MACCS fingerprint input.
+
+\subsubsection{Logistic Regression}
+Accuracy: 0.677 \quad AUC-ROC: 0.739 \quad F1: 0.688 \quad Precision: 0.664 \quad Recall: 0.714.
+The confusion matrix is provided in Appendix~D (Table~\ref{tab:lr_cm}).
+
+\subsubsection{MLP ($167{\rightarrow}167{\rightarrow}128{\rightarrow}64{\rightarrow}1$)}
+Accuracy: 0.840 \quad AUC-ROC: 0.912 \quad F1: 0.845 \quad Precision: 0.819 \quad Recall: 0.871.
+The confusion matrix is provided in Appendix~D (Table~\ref{tab:mlp_cm}).
+
+\subsubsection{Random Forest}
+The baseline achieves AUC~0.822, offering a reasonable accuracy-interpretability trade-off with shorter TRDP paths compared to deeper forests.
+
+SHAP-guided sampling incurs a modest predictive cost ($\Delta$AUC $\approx -0.02$) in exchange for improved interpretability: we hypothesise that concentrating feature-pool selection on high-importance MACCS keys increases the probability that genuinely relevant chemical substructures co-occur in the same TRDP decision path. 
+
+\begin{table}[h]
+\centering
+\caption{Baseline vs.\ SHAP-guided RF ($T=200$, $d_{\max}=20$) on the test set.}
+\label{tab:shap_guided_d20}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model ($\alpha$)} & \textbf{AUC} & \textbf{F1} & \textbf{Acc} & \textbf{TP} & \textbf{TN} & \textbf{FP / FN} \\
+\midrule
+Baseline ($\alpha=0$) & 0.916 & 0.841 & 0.838 & 7,170 & 6,844 & 1,520 / 1,194 \\
+Guided ($\alpha=1.0$) & 0.905 & 0.826 & 0.823 & 7,047 & 6,715 & 1,649 / 1,317 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+
+\subsection{Interpretability}
+We evaluate interpretability through side-by-side comparison of three explainers applied to the same validation sample: (A)~SHAP TreeExplainer on the baseline RF, (B)~TRDP on the baseline RF, and (C)~TRDP on the SHAP-guided RF.  We select a true-positive validation sample that receives a high-confidence prediction from both models.
+
+\subsubsection{Comparative analysis}
+We assess explanation stability by identifying validation neighbours within $\ell_1$-radius $k$ of an anchor sample and measuring TRDP path agreement. Let $\mathcal{F}^*(\mathbf{x})$ denote the MACCS key indices in the top-ranked TRDP path $\Pi^*(\mathbf{x})$. We define \emph{path feature Jaccard similarity}:
+\begin{equation}
+    S_J(\mathbf{x}, \mathbf{x}') = \frac{|\mathcal{F}^*(\mathbf{x}) \cap \mathcal{F}^*(\mathbf{x}')|}{|\mathcal{F}^*(\mathbf{x}) \cup \mathcal{F}^*(\mathbf{x}')|}
+    \label{eq:jaccard}
+\end{equation}
+and the \emph{prediction consistency} as whether the model assigns the same label:
+\begin{equation}
+    C(\mathbf{x}, \mathbf{x}') = \mathbf{1}\bigl[\hat{y}(\mathbf{x}) = \hat{y}(\mathbf{x}')\bigr]
+    \label{eq:pred_consist}
+\end{equation}
+For the neighbour set $\mathcal{N}_k(\mathbf{x}) = \{\mathbf{x}' \in \mathcal{D}_{\text{val}} : \|\mathbf{x} - \mathbf{x}'\|_1 \leq k,\; \mathbf{x}' \neq \mathbf{x}\}$, we report mean $\bar{S}_J$ and mean $\bar{C}$ across all neighbours.
+
+\paragraph{Results}
+Table~\ref{tab:comparative_a} shows both models achieve $\bar{C}=1.000$ at every threshold, confirming prediction robustness to small perturbations. Explanation stability differs markedly: at $k=20$, the guided RF achieves $\bar{S}_J=0.240$ vs.\ $0.044$ for the baseline (${\times}5.5$); the advantage persists at $k=30$ ($0.170$ vs.\ $0.095$). Additional results are in Appendix~E.
+
+\begin{table}[h]
+\centering
+\caption{Comparative analysis for Sample~A (val[5271]). Prediction consistency ($\bar{C}$) and path-feature Jaccard ($\bar{S}_J$) for baseline vs.\ SHAP-guided RF. For $k\leq10$ no neighbours exist.}
+\label{tab:comparative_a}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{cccccc}
+\toprule
+ & & \multicolumn{2}{c}{\textbf{Baseline RF}} & \multicolumn{2}{c}{\textbf{Guided RF ($\alpha=1$)}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+$k$ & Nbrs & $\bar{C}$ & $\bar{S}_J$ (std) & $\bar{C}$ & $\bar{S}_J$ (std) \\
+\midrule
+20 & 8  & 1.000 & 0.044 (0.039) & 1.000 & \textbf{0.240} (0.276) \\
+30 & 27 & 1.000 & 0.095 (0.175) & 1.000 & 0.170 (0.236) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsubsection{Qualitative Case Study}
+
+We show the top-5 SHAP attributions and the top-5 nodes of the top-ranked TRDP decision path.  In the TRDP columns a value of 2 means both drugs carry the substructure; 1 means exactly one does; 0 means neither.
+
+\paragraph{Sample A (val[5271], $\hat{p}_{\text{base}}=0.877$, $\hat{p}_{\text{guided}}=0.854$).}
+
+\noindent\textbf{SHAP top-5 (baseline RF):} Key~86 ($\phi{=}{+}0.050$, val=2), Key~123 ($\phi{=}{+}0.027$, val=0), Key~145 ($\phi{=}{+}0.020$, val=2), Key~146 ($\phi{=}{+}0.020$, val=0), Key~162 ($\phi{=}{+}0.018$, val=2).
+
+\noindent\textbf{TRDP top-5 (baseline RF, leaf conf.=1.000):} Key~86~$>1.5$ (val=2), Key~136~$\leq0.5$ (val=0), Key~53~$\leq0.5$ (val=0), Key~105~$>1.5$ (val=2), Key~132~$\leq0.5$ (val=0).
+
+\noindent\textbf{TRDP top-5 (guided RF $\alpha{=}1$, leaf conf.=1.000):} Key~125~$>1.5$ (val=2), Key~86~$>1.5$ (val=2), Key~146~$\leq0.5$ (val=0), Key~100~$>1.5$ (val=2), Key~59~$>0.5$ (val=1).
+
+Then, we use the top-5 conditions of the TRDP path as a standalone conjunctive rule and evaluate it on the full validation set (6692 samples). We test the top-5 rule from both the baseline and guided RF.
+
+Table~\ref{tab:rule_accuracy} summarises the results. Both rules are high-precision but low-recall, as expected from a conjunctive rule derived from a single decision path: the conjunction selects a narrow region of chemical space that is strongly indicative of interaction but covers only a small fraction of all interacting pairs. The guided rule's higher precision reflects the tighter, more discriminative feature set selected through SHAP-guided sampling---the same effect that produces more stable Jaccard scores in the comparative analysis above. We have also conducted the same test on other random samples with similar results as shown below.
+
+\begin{table}[h]
+\centering
+\caption{Top-5-condition TRDP rule applied to the full validation set (6{,}692 samples).}%
+\label{tab:rule_accuracy}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Rule} & \textbf{Flagged} & \textbf{TP} & \textbf{FP} & \textbf{Prec} & \textbf{Rec}  \\
+\midrule
+Baseline RF       & 68 & 57 & 11 & 0.838 & 0.017  \\
+Guided RF ($\alpha{=}1$) & 77 & 70 & 7  & \textbf{0.909} & 0.021  \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+
+\subsection{Evaluation}
+
+\paragraph{Predictive accuracy.}
+LR (AUC~0.739) confirms that the DDI classification boundary is non-linear and a linear model is insufficient. MLP achieves the highest raw accuracy (AUC~0.912, F1~0.845), but its black-box nature precludes clinical explanation. RF at depth~20 matches MLP closely (AUC~0.916, F1~0.841) while remaining fully interpretable via TRDP, making it the preferred model for this application. SHAP-guided RF incurs only a modest accuracy cost ($\Delta$AUC~$\approx -0.011$, AUC~0.905), which is acceptable given the interpretability gains described below.
+
+\paragraph{Interpretability.}
+SHAP ranks globally important features, but its output is a vector of real values that the clinician must further interpret to form a decision rule. TRDP, by contrast, surfaces a complete if-then conjunctive rule per prediction. The guided RF's TRDP paths are substantially more consistent: path-feature Jaccard similarity at $k=20$ is $0.240$ vs.\ $0.044$ for the baseline (${\times}5.5$), and the advantage persists at $k=30$ ($0.170$ vs.\ $0.095$). Both models maintain perfect prediction consistency ($\bar{C}=1.000$) across all neighbourhood radii, confirming that explanation improvement is not traded against predictive stability. The guided rule also achieves higher precision as a standalone classifier (0.909 vs.\ 0.838), reflecting the tighter, more discriminative feature set produced by SHAP-guided sampling.
+
+\subsection{Limitations}
+Several limitations remain. Our evaluation is entirely \textit{in silico}, so we cannot qualitatively validate whether the predicted interaction rules are clinically meaningful to practitioners. MACCS fingerprints capture structural substructures but omit properties such as protein binding and metabolic pathways that also drive DDIs. Finally, BIOSNAP is derived from Western drug databases and may not reflect the specific drug portfolio or prescribing patterns of Singapore's primary care setting.
+
+\section{Conclusion and Future Work}
+We presented an interpretable ML pipeline for DDI prediction tailored to Singapore's clinical context. Among three models, RF at depth~20 offers the best accuracy-interpretability balance. Our proposed SHAP-guided TRDP method improves explanation path consistency by up to \textbf{5.5} times at a modest cost of $\Delta\text{AUC}\approx{-0.02}$, yielding conjunctive clinical rules that are immediately actionable by clinicians interpretation. 
+
+However, the current interpretation can be further improved through the incorperation of more ML models such as transformer which can translate chemical rules into plausible explanations. We also plan to cooperate with the local healthcare authority for prospective clinical validation and curating a Singapore-specific drug interaction dataset to reduce Western-database bias. We also plan to utilise a higher-resolution strucutral encoding in pursuit of a more accurate representation of potential chemical reactions.
+
 \bibliography{CS3264_Final_Report}
+
+
+\section{Group Member Contributions}
+\begin{itemize}
+    \item Member 1 An Xiao: Report Draft, TRDP ideation
+    \item Member 2 Liu Lexi: Research in database and baseline algorithm
+    \item Member 3 Zhou Zirun: Experiment for TRDP and baseline algorithms
+\end{itemize}
+
+\section{Appendix A: MACCS Key to interpretation table}
+The original MACCS Keys consist of 166 bits, each corresponding to a specific chemical substructure. The interpretation of each key was uploaded in the following link. We have converted the chemical substructure into a more human-readable format, which is shown in the link below The table also includes the original MACCS key number for reference.
+
+\textbf{Oringinal MACCS Keys}: \url{https://github.com/rdkit/rdkit/blob/master/rdkit/Chem/MACCSkeys.py}
+
+\textbf{Human-readable MACCS Keys}: \url{https://github.com/Anxinal/CS3264-FinalProject-Experiment/blob/main/MACCS_Keys_Human_Readable_Reference.xlsx}
+
+\section{Appendix B: Experiment Repository}
+The experiment code and data processing scripts are available in the following GitHub repository: 
+
+\url{https://github.com/Anxinal/CS3264-FinalProject-Experiment.git}
+
+
+\section{Appendix D: Additional Experiment Results}
+\label{sec:appendix_d}
+
+\subsection*{Logistic Regression --- Confusion Matrix}
+\begin{table}[h]
+\centering
+\caption{Logistic Regression --- confusion matrix (test set).}
+\label{tab:lr_cm}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred.\ Positive} & \textbf{Pred.\ Negative} \\
+\midrule
+\textbf{Actual Positive} & TP = 5,976 & FN = 2,388 \\
+\textbf{Actual Negative} & FP = 3,021 & TN = 5,343 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{MLP --- Confusion Matrix}
+\begin{table}[h]
+\centering
+\caption{MLP --- confusion matrix (test set).}
+\label{tab:mlp_cm}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred.\ Positive} & \textbf{Pred.\ Negative} \\
+\midrule
+\textbf{Actual Positive} & TP = 7,289 & FN = 1,075 \\
+\textbf{Actual Negative} & FP = 1,609 & TN = 6,755 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Random Forest --- Full Hyperparameter Sweep}
+\begin{table}[h]
+\centering
+\caption{Random Forest AUC-ROC / F1 across all hyperparameter settings.}
+\label{tab:rf_sweep}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{ccccc}
+\toprule
+ & \multicolumn{4}{c}{\textbf{Max Depth}} \\
+\cmidrule(lr){2-5}
+\textbf{Trees} & \textbf{3} & \textbf{5} & \textbf{10} & \textbf{20} \\
+\midrule
+50  & 0.689 / 0.636 & 0.721 / 0.663 & 0.819 / 0.742 & 0.910 / 0.836 \\
+100 & 0.692 / 0.634 & 0.722 / 0.664 & 0.821 / 0.741 & 0.913 / 0.838 \\
+200 & 0.691 / 0.637 & 0.722 / 0.662 & 0.822 / 0.741 & 0.916 / 0.841 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+Increasing tree depth has a much larger effect on performance than increasing tree count: doubling $T$ from 100 to 200 yields $\Delta$AUC $\leq 0.003$, whereas increasing $d_{\max}$ from 3 to 20 yields $\Delta$AUC $\approx 0.22$.  Shallow forests ($d_{\max} \leq 5$) underfit the data.
+
+\subsection*{Best RF ($T=200$, $d_{\max}=20$) --- Confusion Matrix}
+\begin{table}[h]
+\centering
+\caption{Best RF ($T=200$, $d_{\max}=20$) --- confusion matrix (test set).}
+\label{tab:rf_best_cm}
+\begin{tabular}{lcc}
+\toprule
+ & \textbf{Pred.\ Positive} & \textbf{Pred.\ Negative} \\
+\midrule
+\textbf{Actual Positive} & TP = 7,170 & FN = 1,194 \\
+\textbf{Actual Negative} & FP = 1,520 & TN = 6,844 \\
+\bottomrule
+\end{tabular}
+\end{table}
+Accuracy: 0.838 \quad AUC-ROC: 0.916 \quad F1: 0.841 \quad Precision: 0.825 \quad Recall: 0.857.
+
+\subsection*{Full SHAP-Guided RF $\alpha$ Sweep ($T=200$, $d_{\max}=20$)}
+\begin{table}[h]
+\centering
+\caption{Full $\alpha$ sweep --- SHAP-guided RF ($T=200$, $d_{\max}=20$) on the test set.}
+\label{tab:shap_guided_full}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model ($\alpha$)} & \textbf{AUC} & \textbf{F1} & \textbf{Acc} & \textbf{TP} & \textbf{TN} & \textbf{FP / FN} \\
+\midrule
+Baseline ($\alpha=0$)  & 0.822 & 0.741 & 0.738 & 6,281 & 6,060 & 2,304 / 2,083 \\
+Guided ($\alpha=0.3$)  & 0.805 & 0.728 & 0.726 & 6,146 & 5,992 & 2,372 / 2,218 \\
+Guided ($\alpha=0.7$)  & 0.802 & 0.723 & 0.720 & 6,108 & 5,931 & 2,433 / 2,256 \\
+Guided ($\alpha=1.0$)  & 0.801 & 0.725 & 0.721 & 6,164 & 5,895 & 2,469 / 2,200 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
+\section{Appendix E: Additional Comparative Analysis Results}
+\label{sec:appendix_e}
+
+Tables~\ref{tab:comparative_b} and~\ref{tab:comparative_c} report the comparative analysis for the two additional anchor samples val[2823] and val[5640], with separate Jaccard columns for the baseline and guided RF.
+
+\begin{table}[h]
+\centering
+\caption{Comparative analysis for Sample~B (val[2823]).}%
+\label{tab:comparative_b}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{cccccc}
+\toprule
+ & & \multicolumn{2}{c}{\textbf{Baseline RF}} & \multicolumn{2}{c}{\textbf{Guided RF ($\alpha=1$)}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+$k$ & Nbrs & $\bar{C}$ & $\bar{S}_J$ (std) & $\bar{C}$ & $\bar{S}_J$ (std) \\
+\midrule
+1  & 0  & ---   & ---           & ---   & ---           \\
+3  & 0  & ---   & ---           & ---   & ---           \\
+5  & 1  & 1.000 & 1.000 (0.000) & 1.000 & 1.000 (0.000) \\
+10 & 1  & 1.000 & 1.000 (0.000) & 1.000 & 1.000 (0.000) \\
+20 & 5  & 1.000 & 0.272 (0.369) & 1.000 & 0.438 (0.424) \\
+30 & 26 & 1.000 & 0.163 (0.307) & 1.000 & 0.222 (0.338) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Comparative analysis for Sample~C (val[5640]).}%
+\label{tab:comparative_c}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{cccccc}
+\toprule
+ & & \multicolumn{2}{c}{\textbf{Baseline RF}} & \multicolumn{2}{c}{\textbf{Guided RF ($\alpha=1$)}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+$k$ & Nbrs & $\bar{C}$ & $\bar{S}_J$ (std) & $\bar{C}$ & $\bar{S}_J$ (std) \\
+\midrule
+1  & 0  & ---   & ---           & ---   & ---           \\
+3  & 0  & ---   & ---           & ---   & ---           \\
+5  & 1  & 1.000 & 1.000 (0.000) & 1.000 & 1.000 (0.000) \\
+10 & 2  & 1.000 & 0.500 (0.500) & 1.000 & 1.000 (0.000) \\
+20 & 6  & 1.000 & 0.208 (0.358) & 1.000 & 0.571 (0.404) \\
+30 & 30 & 1.000 & 0.122 (0.193) & 1.000 & 0.209 (0.286) \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+
 
 \end{document}
