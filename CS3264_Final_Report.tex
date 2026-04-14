@@ -85,15 +85,23 @@ Singapore presents a particularly important context for addressing this problem.
     \label{fig:population_pyramid}
 \end{figure}
 
-Second, Singapore exhibits a unique disease profile, with high rates of metabolic and cardiovascular conditions, which often necessitate multi-drug treatment plans. Accordingly, our proposed app is intended as a prescription-stage decision support tool for clinicians in Singapore, flagging potentially risky drug pairs.
+Second, Singapore exhibits a unique disease profile, with high rates of metabolic and cardiovascular conditions(to cite), which often necessitate multi-drug treatment plans.  Existing drug safety guidelines for older adults have often been developed for Western populations and may not transfer directly to Asian settings, reinforcing the need to evaluate clinician-facing medication-safety tools in the local Singapore context.(to cite) Accordingly, our proposed app is intended as a prescription-stage decision support tool for clinicians in Singapore, flagging potentially risky drug pairs.
 
 \subsection{Why machine learning algorithms}
 
-DDI prediction is naturally a binary classification task, and ML has proven effective at learning interaction patterns from molecular features.\cite{Gheorghita2025} As prescription size grows, the number of drug pairs scales as $\binom{n}{2}$, making manual checking intractable; ML can also predict previously unobserved interactions beyond existing database coverage. In this high-stakes clinical context, interpretability is essential: clinicians must understand \emph{why} an interaction is flagged. We therefore prioritise interpretable models over higher-accuracy black-box alternatives.
+Machine learning has been effective in detecting patterns of drug interactions as it can be categorised as a classification task.\cite{Gheorghita2025} When the number of drugs involved in a single prescription increase, we expect the number of possible pair of drugs that may produce interaction to increase exponentially($N =$ $n\choose2$, n is the number of drugs and N is the number of possible pairs), which eventually leads to human oversight. 
+
+Although drug-interaction databases remain useful references for known interactions, machine learning can complement them by predicting previously unobserved DDIs from structured drug features such as chemical fingerprints and related representations. 
+
+Furthermore, in a high-stakes clinical setting, such interpretability is necessary, because doctors must be able to understand why a possible interaction has been flagged for a decision. Thus, We leverage interpretable ML algorithm against black-box models with stronger accuracies but less interpretability necessary for clinical support.
+
+
 
 \subsection{Ethical considerations}
 
-We envision the algorithm strictly as a decision-support tool: the clinician retains final authority and accountability, while patients are not directly exposed to model outputs. This ensures appropriate human oversight in this high-stakes domain.
+While the previous sections mention the advantages of using machine learning algorithms to detect drug interactions, we also acknowledge the important ethical considerations as the healthcare industry typically involves high-stake responsibilities where many believe that human decisions must be involved. Drug prescription is no exception. 
+
+First, any misjudgement by the algorithm must be held accountable. The machine learning algorithm can never make any independent judgement on its own without human oversight. The patient, who are unable to judge the accuracy of the predicted drug interaction result, should also not be exposed to the decision making process. Therefore, we envision the algorithm to be most ethically positioned as advisory to the doctors, with which the doctor gives the final decision on whether the drug interaction may actually happen and be held accountable for his own judgement as a medical professional.
 
 \section{Method}
 
@@ -109,7 +117,9 @@ where $D_A, D_B \in \mathbb{R}^{d}$ are MACCS fingerprints of the two drugs and 
 \subsubsection{Data Source}
 \ 
 \newline
-We use the \textbf{BIOSNAP ChChMiner} dataset (derived from DrugBank), containing $\sim$40,000 experimentally validated positive DDI pairs after filtering pairs with missing molecular structures. Negative examples are constructed by sampling drug pairs absent from the positive set at a 1:1 ratio. We assume unlisted pairs are non-interacting—a standard open-world assumption in DDI benchmarking.
+We use the \textbf{BIOSNAP ChChMiner} dataset, which is derived from DrugBank and contains experimentally validated drug-drug interaction (DDI) pairs. Each entry in the raw dataset consists of two DrugBank IDs indicating that the pair of drugs is known to interact and should not be used together. After filtering out drug pairs for which molecular structures could not be retrieved, our dataset contains approximately 40,000 positive examples (interacting pairs). 
+
+Since BIOSNAP contains only known positive drug-drug interactions (DDIs), negative examples must be constructed. Following standard practice, we randomly sample drug pairs absent from the positive set, or drug pairs with identical drugs at a 1:1 ratio, under two assumptions: a drug does not interact with itself, and any pair not listed in DrugBank is treated as non-interacting. While the latter assumption may exclude undiscovered interactions, this open-world limitation is well-recognised in DDI benchmarking and consistent with prior work. (To Cite)
 
 \subsection{Input construction}
 
@@ -134,13 +144,15 @@ where $x_i$ is the $i$-th dimension of the input vector, corresponding to the $i
 
 \subsubsection{Logistic Regression}
 \
-\newline
 Logistic Regression is our linear baseline, operating on the 324-dimensional concatenated drug-pair fingerprint. It provides a lower bound on performance and quantifies the benefit of non-linear models for this task.
 
 \subsubsection{Multi-Layer Perceptrons (MLP)}
 \ 
-\newline
-MLP captures non-linear interaction patterns that logistic regression cannot model. However, its outputs are not directly interpretable, motivating the use of SHAP and our proposed TRDP method for explanation.
+Intuitively, MLP with logistic output layer is a natural choice for this task, as it can capture complex, non-linear relationships in a binary classification setting such as drug interactions.
+
+The particular relationship presented in drug interaction through naive logistic regression without any feature transformation since the true function can be non-linear. On the other hand, through the universal approximation theorem, MLP allows any polynomial continuous functions to be accurately approximated with sufficient number of neurons. (To Cite)
+
+However, a major limitation of MLP algorithm is its difficulty in providing an interpretable explanation to the doctor when advising possible drug interactions. Although algorithms such as LIME provides model-agnostic explanations. There are simpler alternatives such as SHAP, whose limitation will be discussed in the later section.
 
 \subsubsection{Random Forest}
 \
@@ -148,7 +160,7 @@ MLP captures non-linear interaction patterns that logistic regression cannot mod
 Random Forest, introduced by \citet{Breiman2001}, is a non-parametric ensemble method that combines the predictions of $T$ independently trained decision trees to reduce variance while retaining the low bias of individual trees. Each tree $\mathcal{T}_t$ ($t = 1, \ldots, T$) is trained on a bootstrap resample $\mathcal{D}_t \sim \text{Bootstrap}(\mathcal{D})$ drawn \emph{with replacement} from the full training set $\mathcal{D} = \{(\mathbf{x}_i, y_i)\}_{i=1}^{n}$, where $\mathbf{x}_i \in \mathbb{R}^{p}$ and $y_i \in \{0, 1\}$.
  
 \paragraph{Tree Construction via CART.}
-Each tree is grown using CART splits on Gini impurity \cite{Breiman1984}.
+Each tree is grown using CART splits on Gini impurity \cite{Breiman1984}, where $m$ features are randomly sampled each time a new branch extends from the root node and the best split is only chosen within the sampled features based on the boostrap sample of training data.
 
 \paragraph{Ensemble Prediction.}
 Given $T$ fitted trees, the predicted interaction probability for a drug pair $\mathbf{x}$ is the average of the per-tree leaf class probabilities:
@@ -161,12 +173,14 @@ where $\hat{p}_t(\mathbf{x})$ is the fraction of positive training samples in th
 \paragraph{Applicability to This Task.}
 Several properties of the DDI task make Random Forest a principled model choice.
  
-\textit{(i) Ordinal feature space.} CART splits $x_j \leq \tau$ natively partition the $\{0,1,2\}^p$ fingerprint space without requiring normalisation.
+\textit{(i) Ordinal feature space.} CART splits $x_j \leq \tau$ natively partition the $\{0,1,2\}^p$ fingerprint space without requiring normalisation or any assumption on the distribution of the features.
 
-\textit{(ii) Conjunctive decision boundaries.} A root-to-leaf path encodes conditions such as $x_k, x_r \geq 1$, directly representing co-occurring chemical substructures. Decorrelated trees are well-suited to interactions arising from independent biological pathways, and RF has been shown effective for DDI prediction on fingerprints\cite{Ryu2018}.
+\textit{(ii) Accurate capturing of potential drug interactions through decision boundaries.} CART naturally encodes conjunctive rules: a single path from root to leaf can represent conditions such as  $x_k, x_r \geq 1$ (Both drugs together contain chemicals represented by index $k$ or $r$ that may interact with each other). Moreover, given that drug interaction mechanisms can operate through largely independent biological pathways, the decorrelated, parallel trees from the random forest are theoretically well-suited to this domain. In fact, Random forests have been shown to be effective for DDI prediction on molecular fingerprints in prior work\cite{Ryu2018}.
 
-\paragraph{Why not gradient boosting?}
-While Gradient Boosting may achieve higher accuracy and is also a competitive model used in DDIs, Gradient boosting's sequential residual-fitting makes individual tree paths uninterpretable in isolation, directly undermining TRDP.
+
+\paragraph{Why not other models?}
+Other applicable models such as gradient boosting machines which may produce more accurate results. However, gradient boosting machine trains its decides branch based on the residual of the previous result which renders gradient boosting uninterpretable. (To Cite)
+
 
 \subsubsection{Interpretable Random Forest}
 \
@@ -270,7 +284,10 @@ Dropout with probability 0.3 is applied after each of the first two hidden layer
 \subsection{Random Forest}
  In our experiments, we train a forest of $T = 200$ trees using the \texttt{sklearn} defaults: $m = \lfloor\sqrt{p}\rfloor$. We limit the tree depth to 20 to ensure interpretability of individual trees, and minimum samples per leaf of 1. We also limit the maximum number of displayed decision branches in the explanation to 5.
 
-We compare two different types of random forests in our experiment. The first is the \textbf{standard TRDP random forest} whose feature sampling follows uniform prior. The second is the \textbf{SHAP-adjusted TRDP random forest} where features are sampled based on the normalised SHAP score of each feature in standard random forest. We choose to display the top \textbf{5} features for top-\textbf{1} tree ($K = 1$) for interpretability test
+We compare two random forests: the \textbf{standard TRDP RF} with uniform feature sampling, and the \textbf{SHAP-adjusted TRDP RF} where features are sampled proportionally to their SHAP importance scores from the first-stage forest. We display the top-5 conditions of the top-1 tree ($K=1$) for interpretability evaluation.
+
+\subsection{Implementation}
+Molecular fingerprints are computed using \textbf{RDKit}~\cite{rdkit}. LR and RF are implemented in \textbf{scikit-learn}; MLP is implemented in \textbf{PyTorch} with the Adam optimiser. SHAP attributions are computed via the \textbf{SHAP} TreeExplainer library~\cite{Lundberg2020}. All experiment code is available in the repository listed in Appendix~B.
 
 \section{Results}
 \subsection{Predictive Performance}
